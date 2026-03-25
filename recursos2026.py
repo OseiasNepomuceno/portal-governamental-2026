@@ -1,43 +1,49 @@
 import streamlit as st
 import pandas as pd
-import requests
+import gdown
 import zipfile
-import os  # <-- ISSO CORRIGE O ERRO "NOME OS NÃO DEFINIDO"
+import os
 from io import BytesIO
 
 # --- CONFIGURAÇÃO DO GOOGLE DRIVE ---
-ID_DO_ARQUIVO_DRIVE = "1p_ihzkzi-osypEKjOaBy8LKz5rR9Kqtc"
-
-# Esta URL é mais robusta para arquivos grandes (>40MB)
-URL_DIRECT_DOWNLOAD = f'https://drive.google.com/uc?export=download&id={ID_DO_ARQUIVO_DRIVE}&confirm=t'
+ID_DO_ARQUIVO_DRIVE = "COLE_AQUI_O_SEU_ID"
+URL_DRIVE = f'https://drive.google.com/uc?id={ID_DO_ARQUIVO_DRIVE}'
 
 
 @st.cache_data(ttl=86400)
 def carregar_dados_drive():
     try:
-        # Adicionamos um cabeçalho para o Google Drive aceitar a requisição do Streamlit
-        session = requests.Session()
-        response = session.get(URL_DIRECT_DOWNLOAD, stream=True)
+        # gdown.download é a forma mais segura de baixar arquivos >40MB do Drive
+        output = "dados_temporarios.zip"
+        # O gdown cuida do aviso de "arquivo grande" automaticamente
+        gdown.download(URL_DRIVE, output, quiet=False, fuzzy=True)
 
-        if response.status_code == 200:
-            # Lendo o conteúdo do ZIP
-            with zipfile.ZipFile(BytesIO(response.content)) as z:
-                # Procura o CSV dentro do ZIP
-                lista_arquivos = z.namelist()
-                nome_csv = next((f for f in lista_arquivos if f.endswith('.csv')), None)
-
-                if nome_csv:
-                    with z.open(nome_csv) as f:
-                        # Lendo o CSV (ajuste o sep=';' se necessário)
-                        df = pd.read_csv(f, sep=';', encoding='latin1', low_memory=False)
-                        return df, None
-                else:
-                    return None, "Nenhum arquivo CSV encontrado dentro do ZIP."
+        if os.path.exists(output):
+            with zipfile.ZipFile(output, 'r') as z:
+                # Localiza o CSV dentro do ZIP
+                nome_csv = [f for f in z.namelist() if f.endswith('.csv')][0]
+                with z.open(nome_csv) as f:
+                    df = pd.read_csv(f, sep=';', encoding='latin1', low_memory=False)
+                    # Deleta o arquivo temporário após ler para não ocupar espaço
+                    os.remove(output)
+                    return df, None
         else:
-            return None, f"Erro no Drive: Status {response.status_code}"
-    except Exception as e:
-        return None, f"Erro técnico: {e}"
+            return None, "O arquivo não foi baixado corretamente do Drive."
 
+    except Exception as e:
+        return None, f"Erro ao processar base de dados: {e}"
+
+
+# --- INTERFACE ---
+st.title("🔍 Radar de Recursos 2026")
+df, erro = carregar_dados_drive()
+
+if erro:
+    st.error(f"⚠️ {erro}")
+    st.info("Dica: Verifique se o arquivo no Drive está como 'Qualquer pessoa com o link'.")
+elif df is not None:
+    st.success(f"✅ {len(df)} registros carregados com sucesso!")
+    # Aqui entra o seu código de filtros (st.selectbox, etc)
 
 # Título do Módulo
 st.title("🔍 Radar de Recursos 2026")
