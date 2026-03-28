@@ -7,7 +7,7 @@ from docx.enum.text import WD_ALIGN_PARAGRAPH
 import io
 
 def executar(): # ADICIONE ESTA LINHA
-    st.header("📑 Revisor de Estatuto MROSC")
+   
     # TODO O RESTANTE DO SEU CÓDIGO AQUI COM UM "TAB" PARA DENTRO
 
     # --- CONFIGURAÇÃO DA API ---
