@@ -4,3 +4,4 @@ gdown
 pandas
 requests
 openpyxl
+reportlab
