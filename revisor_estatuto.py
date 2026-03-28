@@ -5,7 +5,7 @@ import io
 
 # --- CONFIGURAÇÃO DA API ---
 # DICA: Em produção, o ideal é usar st.secrets para esconder sua chave
-API_KEY = "SUA_CHAVE_AQUI" 
+API_KEY = "AIzaSyCkevsDNpmeFE3rB5y32Qm6jh5vxoi_ckg" 
 genai.configure(api_key=API_KEY)
 
 def extrair_texto_pdf(arquivo_pdf):
