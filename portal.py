@@ -99,7 +99,7 @@ if check_password():
 
     elif pagina == "⚖️ Revisor de Estatuto":
         try:
-            with open("revisor_estatuto_hibrido.py", encoding="utf-8") as f:
+            with open("revisor_estatuto.py", encoding="utf-8") as f:
                 exec(f.read())
         except Exception as e:
             st.error(f"Erro ao carregar o módulo: {e}")
