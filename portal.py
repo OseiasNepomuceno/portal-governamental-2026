@@ -21,6 +21,13 @@ escolha = st.sidebar.radio("Navegação do Consultor:", menu)
 # --- LÓGICA DE NAVEGAÇÃO (CHAMANDO OS OUTROS ARQUIVOS) ---
 
 if escolha == "📊 Radar de Recursos 2026":
+    try:
+        import recursos2026
+        recursos2026.executar()
+    except Exception as e:
+        st.error(f"Erro ao carregar módulo: {e}")
+
+if escolha == "📊 Radar de Recursos 2026":
     import recursos2026
     recursos2026.executar() # Importante: você vai precisar ajustar os arquivos .py conforme abaixo
 
