@@ -1,52 +1,45 @@
 import streamlit as st
 import google.generativeai as genai
 from PyPDF2 import PdfReader
-import io
 
-# --- CONFIGURAÇÃO DA API ---
-# DICA: Em produção, o ideal é usar st.secrets para esconder sua chave
-API_KEY = "AIzaSyCkevsDNpmeFE3rB5y32Qm6jh5vxoi_ckg" 
+# --- CONFIGURAÇÃO DA API (FORÇANDO VERSÃO ESTÁVEL) ---
+API_KEY = "SUA_CHAVE_AQUI" 
 genai.configure(api_key=API_KEY)
 
-def extrair_texto_pdf(arquivo_pdf):
-    leitor = PdfReader(arquivo_pdf)
-    texto = ""
-    for pagina in leitor.pages:
-        texto += pagina.extract_text()
-    return texto
 def analisar_estatuto(texto_estatuto):
-    # Tentativa de usar o modelo mais atualizado
-    # O nome 'models/gemini-1.5-flash' é o padrão oficial para 2026
     try:
-        model = genai.GenerativeModel('models/gemini-1.5-flash')
+        # Usando o nome técnico completo e atualizado para 2026
+        model = genai.GenerativeModel('models/gemini-1.5-flash-latest')
         
         prompt = f"""
-        Você é um consultor jurídico sênior da CORE ESSENCE.
-        Analise o Estatuto Social abaixo e forneça um parecer técnico:
+        Você é um consultor jurídico sênior da CORE ESSENCE especializado em MROSC (Lei 13.019/2014).
+        Analise o Estatuto Social abaixo e forneça um parecer técnico rigoroso.
         
-        1. Verifique conformidade com a Lei 13.019/2014 (MROSC).
-        2. Identifique pontos de atenção na governança.
-        3. Liste cláusulas faltantes ou ambíguas.
+        Estruture sua resposta assim:
+        1. ✅ PONTOS DE CONFORMIDADE: O que o estatuto já atende legalmente.
+        2. ⚠️ PONTOS DE ATENÇÃO: Cláusulas ambíguas ou que geram risco.
+        3. ❌ CLÁUSULAS FALTANTES: O que é obrigatório e não foi encontrado (ex: destinação de bens, ficha limpa, etc).
+        4. 💡 RECOMENDAÇÃO CORE ESSENCE: Sugestão de redação para as correções.
 
-        Formate com Emojis:
-        ✅ Pontos Positivos
-        ⚠️ Atenção
-        ❌ Faltantes
-        💡 Sugestões
-
-        Texto:
+        Texto do Estatuto:
         {texto_estatuto[:30000]} 
         """
         
+        # Gerando o conteúdo
         response = model.generate_content(prompt)
-        return response.text
+        
+        # Verificação de segurança para a resposta
+        if response.text:
+            return response.text
+        else:
+            return "A IA não conseguiu gerar uma resposta. Verifique o conteúdo do PDF."
+            
     except Exception as e:
-        # Se o 1.5-flash falhar, tentamos o gemini-pro como alternativa de segurança
-        st.warning("Tentando modelo de backup...")
-        model_backup = genai.GenerativeModel('gemini-pro')
-        response = model_backup.generate_content(prompt)
-        return response.text
+        # Log detalhado para te ajudar se ainda houver erro
+        st.error(f"Detalhe técnico do erro: {e}")
+        return None
 
+# --- RESTANTE DA INTERFACE PERMANECE IGUAL ---
 # --- INTERFACE ---
 st.title("📑 Revisor de Estatuto Inteligente")
 st.caption("CORE ESSENCE - Inteligência Artificial Aplicada")
