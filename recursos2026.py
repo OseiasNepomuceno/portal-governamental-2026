@@ -9,7 +9,8 @@ from reportlab.pdfgen import canvas
 from reportlab.lib import colors
 
 # --- CONFIGURAÇÃO DE ACESSO ---
-FILE_ID = '1p_ihzkzi-osypEKjOaBy8LKz5rR9Kqtc'
+# Ele vai buscar o ID_RECURSOS que você salvou no Secrets
+FILE_ID = st.secrets["ID_RECURSOS"]
 url = f'https://drive.google.com/uc?id={FILE_ID}'
 zip_output = 'dados_radar.zip'
 extract_path = 'dados_extraidos'
