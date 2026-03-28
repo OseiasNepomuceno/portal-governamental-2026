@@ -1,14 +1,12 @@
 import streamlit as st
 import google.generativeai as genai
 from PyPDF2 import PdfReader
-import io
 
 # --- CONFIGURAÇÃO DA API ---
-# Substitua pela sua chave real do Google AI Studio
 API_KEY = "AIzaSyCkevsDNpmeFE3rB5y32Qm6jh5vxoi_ckg" 
 genai.configure(api_key=API_KEY)
 
-# 1. FUNÇÃO PARA EXTRAIR TEXTO (O que estava faltando!)
+# 1. FUNÇÃO PARA EXTRAIR TEXTO
 def extrair_texto_pdf(arquivo_pdf):
     try:
         leitor = PdfReader(arquivo_pdf)
@@ -22,11 +20,29 @@ def extrair_texto_pdf(arquivo_pdf):
         st.error(f"Erro ao ler o arquivo PDF: {e}")
         return ""
 
-# 2. FUNÇÃO PARA ANALISAR COM O GEMINI
+# 2. FUNÇÃO DE ANÁLISE COM VARREDURA DE MODELO (CORREÇÃO DO ERRO 404)
 def analisar_estatuto(texto_estatuto):
     try:
-        # Usando a versão estável mais recente para evitar erro 404
-        model = genai.GenerativeModel('gemini-1.5-flash')
+        # Lista os modelos disponíveis para a sua chave API
+        modelos_disponiveis = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
+        
+        # Ordem de preferência: Flash 1.5 (mais rápido) -> Pro 1.5 -> Pro 1.0 (antigo)
+        if 'models/gemini-1.5-flash' in modelos_disponiveis:
+            modelo_escolhido = 'models/gemini-1.5-flash'
+        elif 'models/gemini-1.5-pro' in modelos_disponiveis:
+            modelo_escolhido = 'models/gemini-1.5-pro'
+        elif 'models/gemini-pro' in modelos_disponiveis:
+            modelo_escolhido = 'models/gemini-pro'
+        else:
+            # Pega o primeiro disponível se nenhum dos acima for encontrado
+            modelo_escolhido = modelos_disponiveis[0] if modelos_disponiveis else None
+
+        if not modelo_escolhido:
+            st.error("Nenhum modelo compatível encontrado na sua conta Google.")
+            return None
+
+        st.info(f"Usando modelo: {modelo_escolhido}")
+        model = genai.GenerativeModel(modelo_escolhido)
         
         prompt = f"""
         Você é um consultor jurídico sênior da CORE ESSENCE especializado em MROSC (Lei 13.019/2014).
@@ -48,22 +64,17 @@ def analisar_estatuto(texto_estatuto):
         st.error(f"Erro na comunicação com a IA: {e}")
         return None
 
-# --- 3. INTERFACE DO USUÁRIO ---
+# --- INTERFACE ---
 st.title("📑 Revisor de Estatuto Inteligente")
 st.caption("CORE ESSENCE - Inteligência Artificial Aplicada")
 st.markdown("---")
 
-st.write("### 📤 Upload do Documento")
 arquivo = st.file_uploader("Arraste o PDF do Estatuto aqui", type=["pdf"])
 
-if arquivo is not None:
-    # O arquivo só é processado se for carregado
-    with st.spinner("Extraindo texto do documento..."):
-        texto_extraido = extrair_texto_pdf(arquivo)
-        
+if arquivo:
+    texto_extraido = extrair_texto_pdf(arquivo)
     if texto_extraido:
         st.success("Texto extraído com sucesso!")
-        
         if st.button("Iniciar Análise CORE ESSENCE"):
             with st.spinner("O Gemini está analisando as cláusulas..."):
                 resultado = analisar_estatuto(texto_extraido)
@@ -71,16 +82,4 @@ if arquivo is not None:
                     st.markdown("---")
                     st.subheader("📋 Parecer Técnico")
                     st.markdown(resultado)
-                    
-                    # Botão para baixar o parecer em texto
-                    st.download_button(
-                        label="📥 Baixar Parecer em TXT",
-                        data=resultado,
-                        file_name="Parecer_Estatuto_CoreEssence.txt",
-                        mime="text/plain"
-                    )
-    else:
-        st.warning("Não foi possível extrair texto deste PDF. Verifique se ele não é apenas uma imagem.")
-
-else:
-    st.info("Aguardando upload de arquivo PDF para iniciar a revisão.")
+                    st.download_button("📥 Baixar Parecer", data=resultado, file_name="Parecer_Estatuto.txt")
