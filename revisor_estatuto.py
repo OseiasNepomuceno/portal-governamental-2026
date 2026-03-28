@@ -5,7 +5,7 @@ import io
 
 # --- CONFIGURAÇÃO DA API ---
 # Substitua pela sua chave real do Google AI Studio
-API_KEY = "SUA_CHAVE_AQUI" 
+API_KEY = "AIzaSyCkevsDNpmeFE3rB5y32Qm6jh5vxoi_ckg" 
 genai.configure(api_key=API_KEY)
 
 # 1. FUNÇÃO PARA EXTRAIR TEXTO (O que estava faltando!)
