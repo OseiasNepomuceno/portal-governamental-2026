@@ -23,11 +23,11 @@ def carregar_emendas_drive():
         planilha = [f for f in arquivos if f.endswith('.csv')][0]
         caminho_final = os.path.join(extract_path, planilha)
         
-        # Leitura flexível
+        # Leitura com tratamento para caracteres especiais no início (BOM)
         df = pd.read_csv(caminho_final, sep=';', encoding='latin1', low_memory=False)
-
-        # Padroniza todos os nomes de colunas para MAIÚSCULAS para facilitar a busca
-        df.columns = [str(c).upper().strip() for c in df.columns]
+        
+        # Limpeza básica dos nomes das colunas (remove caracteres invisíveis)
+        df.columns = [c.replace('Ï»¿', '').strip().upper() for c in df.columns]
                 
         return df
     except Exception as e:
@@ -42,60 +42,56 @@ st.markdown("---")
 df_emendas = carregar_emendas_drive()
 
 if df_emendas is not None:
-    # --- MAPEAMENTO DINÂMICO DE COLUNAS ---
-    # Identifica o nome real da coluna de Parlamentar
-    col_parl = next((c for c in ['NOME_PARLAMENTAR', 'NM_PARLAMENTAR', 'NOME_PARL'] if c in df_emendas.columns), None)
-    # Identifica o nome real da coluna de Partido
-    col_partido = next((c for c in ['SIGLA_PARTIDO', 'SG_PARTIDO', 'PARTIDO', 'SIGLA_PARTIDO_PARLAMENTAR'] if c in df_emendas.columns), None)
-    # Identifica a coluna de Valor
-    col_valor = next((c for c in ['VALOR_REPASSE_PROPOSTA', 'VL_REPASSE', 'VALOR_EMENDA'] if c in df_emendas.columns), None)
+    # Nomes exatos baseados no seu retorno
+    col_parl = 'NOME_PARLAMENTAR'
+    col_valor = 'VALOR_REPASSE_PROPOSTA_EMENDA'
+    col_emenda = 'NR_EMENDA'
+    col_tipo = 'TIPO_PARLAMENTAR'
 
-    if col_parl and col_partido and col_valor:
-        
-        # --- LIMPEZA DE DADOS ---
-        df_emendas[col_parl] = df_emendas[col_parl].astype(str).replace('nan', 'NÃO INFORMADO')
-        df_emendas[col_partido] = df_emendas[col_partido].astype(str).replace('nan', 'NÃO INFORMADO')
-        
-        # Limpeza de Valores Financeiros
-        def limpar_financa(v):
-            if isinstance(v, str):
-                v = v.replace('R$', '').replace('.', '').replace(',', '.').strip()
-            return pd.to_numeric(v, errors='coerce')
-        
-        df_emendas[col_valor] = df_emendas[col_valor].apply(limpar_financa).fillna(0)
+    # --- LIMPEZA DE DADOS ---
+    df_emendas[col_parl] = df_emendas[col_parl].astype(str).replace('nan', 'NÃO INFORMADO')
+    
+    def limpar_financa(v):
+        if isinstance(v, str):
+            v = v.replace('R$', '').replace('.', '').replace(',', '.').strip()
+        return pd.to_numeric(v, errors='coerce')
+    
+    df_emendas[col_valor] = df_emendas[col_valor].apply(limpar_financa).fillna(0)
 
-        # --- FILTROS POLÍTICOS ---
-        c1, c2 = st.columns(2)
-        with c1:
-            lista_parl = sorted(df_emendas[col_parl].unique().tolist())
-            autor_sel = st.selectbox("Selecione o Parlamentar:", ["Todos"] + lista_parl)
-        
-        df_filt = df_emendas.copy()
-        if autor_sel != "Todos":
-            df_filt = df_filt[df_filt[col_parl] == autor_sel]
+    # --- FILTROS ---
+    c1, c2 = st.columns(2)
+    with c1:
+        lista_parl = sorted(df_emendas[col_parl].unique().tolist())
+        autor_sel = st.selectbox("Selecione o Parlamentar:", ["Todos"] + lista_parl)
+    
+    df_filt = df_emendas.copy()
+    if autor_sel != "Todos":
+        df_filt = df_filt[df_filt[col_parl] == autor_sel]
 
-        with c2:
-            lista_part = sorted(df_filt[col_partido].unique().tolist())
-            part_sel = st.selectbox("Filtrar por Partido:", ["Todos"] + lista_part)
+    with c2:
+        lista_tipos = sorted(df_filt[col_tipo].dropna().unique().tolist())
+        tipo_sel = st.selectbox("Filtrar por Tipo (Deputado/Senador):", ["Todos"] + lista_tipos)
 
-        if part_sel != "Todos":
-            df_filt = df_filt[df_filt[col_partido] == part_sel]
+    if tipo_sel != "Todos":
+        df_filt = df_filt[df_filt[col_tipo] == tipo_sel]
 
-        # --- MÉTRICAS ---
-        t_emenda = float(df_filt[col_valor].sum())
-        m1, m2, m3 = st.columns(3)
-        m1.metric("Total em Emendas", f"R$ {t_emenda:,.2f}".replace(",", "X").replace(".", ",").replace("X", "."))
-        m2.metric("Parlamentares", len(df_filt[col_parl].unique()))
-        m3.metric("Qtd. Propostas", len(df_filt))
+    # --- MÉTRICAS ---
+    t_emenda = float(df_filt[col_valor].sum())
+    m1, m2, m3 = st.columns(3)
+    m1.metric("Total em Emendas", f"R$ {t_emenda:,.2f}".replace(",", "X").replace(".", ",").replace("X", "."))
+    m2.metric("Nº de Emendas", len(df_filt[col_emenda].unique()))
+    m3.metric("Propostas Geradas", len(df_filt))
 
-        # --- GRÁFICO ---
-        st.subheader("📊 Distribuição por Partido (Valor)")
-        if not df_filt.empty:
-            chart_data = df_filt.groupby(col_partido)[col_valor].sum().sort_values(ascending=False)
-            st.bar_chart(chart_data)
+    # --- GRÁFICO ---
+    st.subheader("📊 Volume de Recursos por Parlamentar")
+    if not df_filt.empty:
+        # Se selecionou um parlamentar, mostra o detalhe, senão mostra o ranking dos top 10
+        if autor_sel == "Todos":
+            chart_data = df_filt.groupby(col_parl)[col_valor].sum().sort_values(ascending=False).head(10)
+        else:
+            chart_data = df_filt.groupby(col_emenda)[col_valor].sum().sort_values(ascending=False)
+        st.bar_chart(chart_data)
 
-        st.markdown("---")
-        st.dataframe(df_filt, use_container_width=True)
-    else:
-        st.error("❌ Não conseguimos identificar as colunas de dados. Verifique os nomes na planilha.")
-        st.write("Colunas encontradas:", list(df_emendas.columns))
+    st.markdown("---")
+    st.write("### Lista de Propostas Disponíveis")
+    st.dataframe(df_filt, use_container_width=True)
