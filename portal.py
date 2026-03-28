@@ -1,7 +1,28 @@
 import streamlit as st
+import os
 
-# --- CONFIGURAÇÃO VISUAL ---
-st.set_page_config(page_title="Plataforma Governamental 2026", layout="wide", page_icon="🏛️")
+# --- CONFIGURAÇÃO VISUAL E LOGO ---
+st.set_page_config(page_title="CORE ESSENCE - Inteligência Governamental 2026", layout="wide", page_icon="🏛️")
+
+# --- CENTRALIZAÇÃO E EXIBIÇÃO DO LOGO E NOME ---
+# Você deve salvar a imagem do logo como 'logo.png' na mesma pasta do GitHub onde está o portal.py
+try:
+    if os.path.exists("logo.png"):
+        col1, col2 = st.columns([1, 4]) # Cria colunas para alinhar logo e texto
+        with col1:
+            st.image("logo.png", width=120) # Ajuste a largura conforme necessário
+        with col2:
+            st.markdown("<h1 style='margin-top: 10px;'>CORE ESSENCE</h1>", unsafe_allow_html=True)
+            st.markdown("<p style='font-size: 1.1em; color: gray;'>Consultoria e Estratégia Governamental 2026</p>", unsafe_allow_html=True)
+    else:
+        st.markdown("<h1 style='text-align: center;'>CORE ESSENCE</h1>", unsafe_allow_html=True)
+        st.markdown("<p style='text-align: center; font-size: 1.1em; color: gray;'>Consultoria e Estratégia Governamental 2026</p>", unsafe_allow_html=True)
+except Exception:
+    st.error("Erro ao carregar o logotipo. Verifique o arquivo 'logo.png'.")
+
+st.markdown("---")
+
+# ... (Resto do seu código de SISTEMA DE LOGIN e CONTEÚDO PROTEGIDO...)
 
 
 # --- SISTEMA DE LOGIN ---
