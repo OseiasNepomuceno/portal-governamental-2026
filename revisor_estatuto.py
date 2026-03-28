@@ -14,28 +14,26 @@ def extrair_texto_pdf(arquivo_pdf):
     for pagina in leitor.pages:
         texto += pagina.extract_text()
     return texto
-
 def analisar_estatuto(texto_estatuto):
+    # Atualizado para a versão 1.5-flash (mais rápida e moderna)
     model = genai.GenerativeModel('gemini-1.5-flash')
     
     prompt = f"""
-    Você é um consultor jurídico sênior especializado em Terceiro Setor e Gestão Governamental da consultoria CORE ESSENCE.
-    Sua tarefa é revisar o Estatuto Social abaixo e fornecer um parecer técnico detalhado.
+    Você é um consultor jurídico sênior da CORE ESSENCE.
+    Analise o Estatuto Social abaixo e forneça um parecer técnico:
     
-    Analise os seguintes pontos:
-    1. Conformidade com o Código Civil.
-    2. Presença de cláusulas obrigatórias para parcerias públicas (MROSC - Lei 13.019/2014).
-    3. Clareza nos objetivos sociais e governança.
-    4. Identificação de possíveis riscos jurídicos ou lacunas.
+    1. Verifique conformidade com a Lei 13.019/2014 (MROSC).
+    2. Identifique pontos de atenção na governança.
+    3. Liste cláusulas faltantes ou ambíguas.
 
-    Formate a resposta com:
-    - ✅ Pontos Positivos
-    - ⚠️ Pontos de Atenção (Necessário ajustar)
-    - ❌ Cláusulas Faltantes
-    - 💡 Sugestão de Redação Melhorada
+    Formate com Emojis:
+    ✅ Pontos Positivos
+    ⚠️ Atenção
+    ❌ Faltantes
+    💡 Sugestões
 
-    Texto do Estatuto:
-    {texto_estatuto[:15000]} # Limitando caracteres para segurança do prompt
+    Texto:
+    {texto_estatuto[:30000]} 
     """
     
     response = model.generate_content(prompt)
