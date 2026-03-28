@@ -1,37 +1,46 @@
 import streamlit as st
-import pandas as pd
 import gdown
+import pandas as pd
 import zipfile
 import os
-from io import BytesIO
 
-# --- CONFIGURAÇÃO DO GOOGLE DRIVE ---
-ID_DO_ARQUIVO_DRIVE = "COLE_AQUI_O_SEU_ID"
-URL_DRIVE = f'https://drive.google.com/uc?id={ID_DO_ARQUIVO_DRIVE}'
+# ID do seu arquivo que você enviou
+FILE_ID = '1p_ihzkzi-osypEKjOaBy8LKz5rR9Kqtc'
+url = f'https://drive.google.com/uc?id={FILE_ID}'
+zip_output = 'dados_radar.zip'
+extract_path = 'dados_extraidos'
 
-
-@st.cache_data(ttl=86400)
-def carregar_dados_drive():
+@st.cache_data(ttl=3600)
+def carregar_e_extrair_dados():
     try:
-        # gdown.download é a forma mais segura de baixar arquivos >40MB do Drive
-        output = "dados_temporarios.zip"
-        # O gdown cuida do aviso de "arquivo grande" automaticamente
-        gdown.download(URL_DRIVE, output, quiet=False, fuzzy=True)
-
-        if os.path.exists(output):
-            with zipfile.ZipFile(output, 'r') as z:
-                # Localiza o CSV dentro do ZIP
-                nome_csv = [f for f in z.namelist() if f.endswith('.csv')][0]
-                with z.open(nome_csv) as f:
-                    df = pd.read_csv(f, sep=';', encoding='latin1', low_memory=False)
-                    # Deleta o arquivo temporário após ler para não ocupar espaço
-                    os.remove(output)
-                    return df, None
+        # 1. Baixa o arquivo ZIP do seu Drive
+        gdown.download(url, zip_output, quiet=True, fuzzy=True)
+        
+        # 2. Extrai o conteúdo do ZIP
+        with zipfile.ZipFile(zip_output, 'r') as zip_ref:
+            zip_ref.extractall(extract_path)
+        
+        # 3. Localiza o arquivo .xlsx ou .csv dentro da pasta extraída
+        arquivos = os.listdir(extract_path)
+        planilha = [f for f in arquivos if f.endswith(('.xlsx', '.csv'))][0]
+        caminho_final = os.path.join(extract_path, planilha)
+        
+        # 4. Lê os dados
+        if planilha.endswith('.xlsx'):
+            return pd.read_excel(caminho_final)
         else:
-            return None, "O arquivo não foi baixado corretamente do Drive."
-
+            return pd.read_csv(caminho_final, sep=';', encoding='latin1')
+            
     except Exception as e:
-        return None, f"Erro ao processar base de dados: {e}"
+        st.error(f"Erro ao processar o Radar: {e}")
+        return None
+
+# Execução
+df = carregar_e_extrair_dados()
+
+if df is not None:
+    st.success(f"✅ Radar de Recursos Ativo! ({len(df)} registros encontrados)")
+    st.dataframe(df.head(10)) # Mostra os primeiros 10 para teste
 
 
 # --- INTERFACE ---
