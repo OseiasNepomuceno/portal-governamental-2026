@@ -14,7 +14,8 @@ url = f'https://drive.google.com/uc?id={FILE_ID}'
 zip_output = 'dados_radar.zip'
 extract_path = 'dados_extraidos'
 
-@st.cache_data(ttl=3600)
+# Atualização: Mensagem personalizada no cache
+@st.cache_data(ttl=3600, show_spinner="Aguarde, carregando dados...")
 def carregar_dados_drive():
     try:
         if not os.path.exists(zip_output):
@@ -25,7 +26,7 @@ def carregar_dados_drive():
         planilha = [f for f in arquivos if f.endswith(('.xlsx', '.csv'))][0]
         caminho_final = os.path.join(extract_path, planilha)
         
-        df = pd.read_excel(caminho_final) if planilha.endswith('.xlsx') else pd.read_csv(caminho_final, sep=';', encoding='latin1')
+        df = pd.read_excel(caminho_final) if planilha.endswith('.xlsx') else pd.read_csv(caminho_final, sep=';', encoding='latin1', low_memory=False)
 
         # Limpeza de Valores
         def limpar_valor(valor):
@@ -58,8 +59,8 @@ def gerar_pdf(df_filtrado, cidade):
     p.drawString(100, 715, f"Valor Total: R$ {df_filtrado['VALOR CONVÊNIO'].sum():,.2f}")
     
     y = 680
-    for i, row in df_filtrado.head(20).iterrows(): # Top 20 para o PDF não ficar gigante
-        p.drawString(100, y, f"- {row['OBJETO DO CONVÊNIO'][:60]}... | R$ {row['VALOR CONVÊNIO']:,.2f}")
+    for i, row in df_filtrado.head(20).iterrows(): 
+        p.drawString(100, y, f"- {str(row['OBJETO DO CONVÊNIO'])[:60]}... | R$ {row['VALOR CONVÊNIO']:,.2f}")
         y -= 20
         if y < 50:
             p.showPage()
@@ -71,8 +72,11 @@ def gerar_pdf(df_filtrado, cidade):
 
 # --- INTERFACE PRINCIPAL ---
 st.title("🔍 Radar de Recursos 2026")
+st.caption("CORE ESSENCE - Consultoria e Estratégia Governamental")
 
-df_radar = carregar_dados_drive()
+# Atualização: Spinner na interface para garantir o feedback visual
+with st.spinner("Aguarde, carregando dados..."):
+    df_radar = carregar_dados_drive()
 
 if df_radar is not None:
     # --- FILTROS EM HIERARQUIA ---
@@ -101,8 +105,9 @@ if df_radar is not None:
     t_lib = float(df_final['VALOR LIBERADO'].sum())
     
     m1, m2, m3 = st.columns(3)
-    m1.metric("Total Convênios", f"R$ {t_conv:,.2f}")
-    m2.metric("Total Liberado", f"R$ {t_lib:,.2f}")
+    # Formatação brasileira para as métricas
+    m1.metric("Total Convênios", f"R$ {t_conv:,.2f}".replace(",", "X").replace(".", ",").replace("X", "."))
+    m2.metric("Total Liberado", f"R$ {t_lib:,.2f}".replace(",", "X").replace(".", ",").replace("X", "."))
     m3.metric("Projetos", len(df_final))
 
     # --- 1. GRÁFICO DE DESTINAÇÃO ---
@@ -115,7 +120,7 @@ if df_radar is not None:
     st.subheader("⚠️ Alertas de Vigência (Próximos Vencimentos)")
     if 'DATA FINAL VIGÊNCIA' in df_final.columns:
         df_final['DATA FINAL VIGÊNCIA'] = pd.to_datetime(df_final['DATA FINAL VIGÊNCIA'], errors='coerce')
-        alertas = df_final.sort_values(by='DATA FINAL VIGÊNCIA').head(5)
+        alertas = df_final.sort_values(by='DATA FINAL VIGÊNCIA').dropna(subset=['DATA FINAL VIGÊNCIA']).head(5)
         st.table(alertas[['OBJETO DO CONVÊNIO', 'DATA FINAL VIGÊNCIA', 'VALOR CONVÊNIO']])
 
     # --- 3. EXPORTAÇÃO PDF ---
