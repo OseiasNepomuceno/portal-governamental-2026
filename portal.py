@@ -20,24 +20,28 @@ escolha = st.sidebar.radio("Navegação do Consultor:", menu)
 
 # --- LÓGICA DE NAVEGAÇÃO (CHAMANDO OS OUTROS ARQUIVOS) ---
 
+# --- LÓGICA DE NAVEGAÇÃO SEGURA ---
+
 if escolha == "📊 Radar de Recursos 2026":
     try:
         import recursos2026
         recursos2026.executar()
     except Exception as e:
-        st.error(f"Erro ao carregar módulo: {e}")
-
-if escolha == "📊 Radar de Recursos 2026":
-    import recursos2026
-    recursos2026.executar() # Importante: você vai precisar ajustar os arquivos .py conforme abaixo
+        st.error(f"Erro ao carregar Radar de Recursos: {e}")
 
 elif escolha == "📈 Radar de Emendas":
-    import radar_emendas_2026
-    radar_emendas_2026.executar()
+    try:
+        import radar_emendas_2026
+        radar_emendas_2026.executar()
+    except Exception as e:
+        st.error(f"Erro ao carregar Radar de Emendas: {e}")
 
 elif escolha == "📑 Revisor de Estatuto (MROSC)":
-    import revisor_estatuto
-    revisor_estatuto.executar()
+    try:
+        import revisor_estatuto
+        revisor_estatuto.executar()
+    except Exception as e:
+        st.error(f"Erro ao carregar Revisor de Estatuto: {e}")
 
 elif escolha == "🚪 Sair":
     st.info("Sessão encerrada com segurança. Até logo, Oseias!")
