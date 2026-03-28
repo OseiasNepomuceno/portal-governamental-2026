@@ -9,7 +9,7 @@ from reportlab.pdfgen import canvas
 from reportlab.lib import colors
 
 def executar(): # ADICIONE ESTA LINHA
-    st.header("📑 Revisor de Estatuto MROSC")
+   
     # TODO O RESTANTE DO SEU CÓDIGO AQUI COM UM "TAB" PARA DENTRO
 
     # --- CONFIGURAÇÃO DE ACESSO ---
