@@ -15,29 +15,37 @@ def extrair_texto_pdf(arquivo_pdf):
         texto += pagina.extract_text()
     return texto
 def analisar_estatuto(texto_estatuto):
-    # Atualizado para a versão 1.5-flash (mais rápida e moderna)
-    model = genai.GenerativeModel('gemini-1.5-flash')
-    
-    prompt = f"""
-    Você é um consultor jurídico sênior da CORE ESSENCE.
-    Analise o Estatuto Social abaixo e forneça um parecer técnico:
-    
-    1. Verifique conformidade com a Lei 13.019/2014 (MROSC).
-    2. Identifique pontos de atenção na governança.
-    3. Liste cláusulas faltantes ou ambíguas.
+    # Tentativa de usar o modelo mais atualizado
+    # O nome 'models/gemini-1.5-flash' é o padrão oficial para 2026
+    try:
+        model = genai.GenerativeModel('models/gemini-1.5-flash')
+        
+        prompt = f"""
+        Você é um consultor jurídico sênior da CORE ESSENCE.
+        Analise o Estatuto Social abaixo e forneça um parecer técnico:
+        
+        1. Verifique conformidade com a Lei 13.019/2014 (MROSC).
+        2. Identifique pontos de atenção na governança.
+        3. Liste cláusulas faltantes ou ambíguas.
 
-    Formate com Emojis:
-    ✅ Pontos Positivos
-    ⚠️ Atenção
-    ❌ Faltantes
-    💡 Sugestões
+        Formate com Emojis:
+        ✅ Pontos Positivos
+        ⚠️ Atenção
+        ❌ Faltantes
+        💡 Sugestões
 
-    Texto:
-    {texto_estatuto[:30000]} 
-    """
-    
-    response = model.generate_content(prompt)
-    return response.text
+        Texto:
+        {texto_estatuto[:30000]} 
+        """
+        
+        response = model.generate_content(prompt)
+        return response.text
+    except Exception as e:
+        # Se o 1.5-flash falhar, tentamos o gemini-pro como alternativa de segurança
+        st.warning("Tentando modelo de backup...")
+        model_backup = genai.GenerativeModel('gemini-pro')
+        response = model_backup.generate_content(prompt)
+        return response.text
 
 # --- INTERFACE ---
 st.title("📑 Revisor de Estatuto Inteligente")
