@@ -4,43 +4,68 @@ import pandas as pd
 import zipfile
 import os
 
-# ID do seu arquivo que você enviou
+# --- CONFIGURAÇÃO ---
 FILE_ID = '1p_ihzkzi-osypEKjOaBy8LKz5rR9Kqtc'
 url = f'https://drive.google.com/uc?id={FILE_ID}'
 zip_output = 'dados_radar.zip'
 extract_path = 'dados_extraidos'
 
+# Função para carregar e limpar os dados
 @st.cache_data(ttl=3600)
-def carregar_e_extrair_dados():
+def carregar_dados_drive(): # Nome da função corrigido para o portal.py encontrar
     try:
-        # 1. Baixa o arquivo ZIP do seu Drive
-        gdown.download(url, zip_output, quiet=True, fuzzy=True)
+        # 1. Download e Extração
+        if not os.path.exists(zip_output):
+            gdown.download(url, zip_output, quiet=True, fuzzy=True)
         
-        # 2. Extrai o conteúdo do ZIP
         with zipfile.ZipFile(zip_output, 'r') as zip_ref:
             zip_ref.extractall(extract_path)
         
-        # 3. Localiza o arquivo .xlsx ou .csv dentro da pasta extraída
+        # 2. Leitura do arquivo (xlsx ou csv)
         arquivos = os.listdir(extract_path)
         planilha = [f for f in arquivos if f.endswith(('.xlsx', '.csv'))][0]
         caminho_final = os.path.join(extract_path, planilha)
         
-        # 4. Lê os dados
         if planilha.endswith('.xlsx'):
-            return pd.read_excel(caminho_final)
+            df = pd.read_excel(caminho_final)
         else:
-            return pd.read_csv(caminho_final, sep=';', encoding='latin1')
+            df = pd.read_csv(caminho_final, sep=';', encoding='latin1')
+
+        # --- FILTRO ANO 2026 ---
+        # Ajuste o nome da coluna 'ANO' se na sua planilha estiver diferente (ex: 'Ano', 'Ano Convênio')
+        if 'ANO' in df.columns:
+            df = df[df['ANO'] == 2026]
+        elif 'Ano' in df.columns:
+            df = df[df['Ano'] == 2026]
+            
+        return df
             
     except Exception as e:
-        st.error(f"Erro ao processar o Radar: {e}")
+        st.error(f"Erro interno no Radar: {e}")
         return None
 
-# Execução
-df = carregar_e_extrair_dados()
+# --- EXECUÇÃO DO MÓDULO ---
+st.title("🔍 Radar de Recursos 2026")
+st.markdown("---")
 
-if df is not None:
-    st.success(f"✅ Radar de Recursos Ativo! ({len(df)} registros encontrados)")
-    st.dataframe(df.head(10)) # Mostra os primeiros 10 para teste
+df_radar = carregar_dados_drive()
+
+if df_radar is not None:
+    if len(df_radar) > 0:
+        st.success(f"✅ Exibindo {len(df_radar)} registros referentes ao ano de 2026.")
+        
+        # --- FILTROS RÁPIDOS ---
+        col1, col2 = st.columns(2)
+        with col1:
+            municipio = st.selectbox("Filtrar por Município:", ["Todos"] + sorted(df_radar['MUNICÍPIO'].unique().tolist()))
+        
+        df_filtrado = df_radar.copy()
+        if municipio != "Todos":
+            df_filtrado = df_filtrado[df_filtrado['MUNICÍPIO'] == municipio]
+            
+        st.dataframe(df_filtrado, use_container_width=True)
+    else:
+        st.warning("⚠️ Atenção: Não foram encontrados dados específicos para o ano de 2026 nesta base.")
 
 
 # --- INTERFACE ---
