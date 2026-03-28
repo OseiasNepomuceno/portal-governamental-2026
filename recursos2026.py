@@ -10,33 +10,32 @@ url = f'https://drive.google.com/uc?id={FILE_ID}'
 zip_output = 'dados_radar.zip'
 extract_path = 'dados_extraidos'
 
-# Função para carregar e limpar os dados
 @st.cache_data(ttl=3600)
-def carregar_dados_drive(): # Nome da função corrigido para o portal.py encontrar
+def carregar_dados_drive():
     try:
-        # 1. Download e Extração
         if not os.path.exists(zip_output):
             gdown.download(url, zip_output, quiet=True, fuzzy=True)
         
         with zipfile.ZipFile(zip_output, 'r') as zip_ref:
             zip_ref.extractall(extract_path)
         
-        # 2. Leitura do arquivo (xlsx ou csv)
         arquivos = os.listdir(extract_path)
         planilha = [f for f in arquivos if f.endswith(('.xlsx', '.csv'))][0]
         caminho_final = os.path.join(extract_path, planilha)
         
-        if planilha.endswith('.xlsx'):
-            df = pd.read_excel(caminho_final)
-        else:
-            df = pd.read_csv(caminho_final, sep=';', encoding='latin1')
+        # Lendo apenas as colunas que importam para economizar memória (Performance)
+        df = pd.read_excel(caminho_final) if planilha.endswith('.xlsx') else pd.read_csv(caminho_final, sep=';', encoding='latin1')
 
+        # --- PADRONIZAÇÃO DE COLUNAS (O SEGREDO DO ERRO) ---
+        # Transformamos todos os nomes de colunas para maiúsculas e sem acentos internamente para facilitar
+        df.columns = [str(c).upper().strip() for c in df.columns]
+        
         # --- FILTRO ANO 2026 ---
-        # Ajuste o nome da coluna 'ANO' se na sua planilha estiver diferente (ex: 'Ano', 'Ano Convênio')
-        if 'ANO' in df.columns:
-            df = df[df['ANO'] == 2026]
-        elif 'Ano' in df.columns:
-            df = df[df['Ano'] == 2026]
+        colunas_ano = ['ANO', 'ANO_CONVENIO', 'EXERCICIO', 'ANO_PROPOSTA']
+        col_ano_encontrada = next((c for c in colunas_ano if c in df.columns), None)
+        
+        if col_ano_encontrada:
+            df = df[df[col_ano_encontrada] == 2026]
             
         return df
             
@@ -44,40 +43,34 @@ def carregar_dados_drive(): # Nome da função corrigido para o portal.py encont
         st.error(f"Erro interno no Radar: {e}")
         return None
 
-# --- EXECUÇÃO DO MÓDULO ---
+# --- INTERFACE ---
 st.title("🔍 Radar de Recursos 2026")
 st.markdown("---")
 
 df_radar = carregar_dados_drive()
 
 if df_radar is not None:
-    if len(df_radar) > 0:
-        st.success(f"✅ Exibindo {len(df_radar)} registros referentes ao ano de 2026.")
+    # Identificar a coluna de Município dinamicamente
+    colunas_mun = ['MUNICÍPIO', 'MUNICIPIO', 'NM_MUNICIPIO', 'NOME_MUNICIPIO', 'MUNICIPIO_BENEFICIARIO']
+    col_mun_real = next((c for c in colunas_mun if c in df_radar.columns), None)
+
+    if col_mun_real:
+        st.success(f"✅ Filtro 2026 Ativo: {len(df_radar)} registros processados.")
         
-        # --- FILTROS RÁPIDOS ---
-        col1, col2 = st.columns(2)
-        with col1:
-            municipio = st.selectbox("Filtrar por Município:", ["Todos"] + sorted(df_radar['MUNICÍPIO'].unique().tolist()))
+        # Filtro de Município
+        lista_municipios = ["Todos"] + sorted(df_radar[col_mun_real].dropna().unique().tolist())
+        municipio_sel = st.selectbox("Selecione a Cidade para análise:", lista_municipios)
         
-        df_filtrado = df_radar.copy()
-        if municipio != "Todos":
-            df_filtrado = df_filtrado[df_filtrado['MUNICÍPIO'] == municipio]
-            
-        st.dataframe(df_filtrado, use_container_width=True)
+        df_final = df_radar.copy()
+        if municipio_sel != "Todos":
+            df_final = df_radar[df_radar[col_mun_real] == municipio_sel]
+        
+        # Exibição
+        st.write(f"### Dados de: {municipio_sel}")
+        st.dataframe(df_final, use_container_width=True)
     else:
-        st.warning("⚠️ Atenção: Não foram encontrados dados específicos para o ano de 2026 nesta base.")
-
-
-# --- INTERFACE ---
-st.title("🔍 Radar de Recursos 2026")
-df, erro = carregar_dados_drive()
-
-if erro:
-    st.error(f"⚠️ {erro}")
-    st.info("Dica: Verifique se o arquivo no Drive está como 'Qualquer pessoa com o link'.")
-elif df is not None:
-    st.success(f"✅ {len(df)} registros carregados com sucesso!")
-    # Aqui entra o seu código de filtros (st.selectbox, etc)
+        st.error("❌ Não encontramos uma coluna de 'Município' na planilha. Verifique o cabeçalho.")
+        st.write("Colunas encontradas:", list(df_radar.columns))
 
 # Título do Módulo
 st.title("🔍 Radar de Recursos 2026")
