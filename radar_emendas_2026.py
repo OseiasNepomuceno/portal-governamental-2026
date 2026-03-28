@@ -5,7 +5,8 @@ import zipfile
 import os
 
 # --- CONFIGURAÇÃO DE ACESSO ---
-FILE_ID = '19cZvPOcHSDUY9PVs22XxwVmSPB5OTh-k'
+# Ele vai buscar o ID_EMENDAS que você salvou no Secrets
+FILE_ID = st.secrets["ID_EMENDAS"]
 url = f'https://drive.google.com/uc?id={FILE_ID}'
 zip_output = 'emendas_radar.zip'
 extract_path = 'emendas_extraidas'
