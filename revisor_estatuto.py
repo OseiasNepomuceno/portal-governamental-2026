@@ -8,6 +8,7 @@ from reportlab.lib.styles import getSampleStyleSheet
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Image
 import io
 import os
+import re
 
 # --- CONFIGURAÇÃO DA API ---
 API_KEY = "AIzaSyCkevsDNpmeFE3rB5y32Qm6jh5vxoi_ckg" 
@@ -48,6 +49,8 @@ def analisar_estatuto(texto_estatuto):
         st.error(f"Erro na IA: {e}")
         return None
 
+
+
 def gerar_pdf_parecer(texto_parecer):
     buffer = io.BytesIO()
     doc = SimpleDocTemplate(buffer, pagesize=letter)
@@ -56,26 +59,47 @@ def gerar_pdf_parecer(texto_parecer):
 
     # --- CABEÇALHO ---
     if os.path.exists("logo.png"):
-        logo = Image("logo.png", width=100, height=50)
-        logo.hAlign = 'LEFT'
-        elementos.append(logo)
+        try:
+            logo = Image("logo.png", width=80, height=40)
+            logo.hAlign = 'LEFT'
+            elementos.append(logo)
+        except:
+            pass
     
     elementos.append(Paragraph("<font size=18 color='#1D3557'><b>CORE ESSENCE - Consultoria Governamental</b></font>", styles['Title']))
     elementos.append(Paragraph("<font size=10 color='gray'>Parecer Técnico de Conformidade Estatutária - Base: Portaria 33/2023</font>", styles['Normal']))
     elementos.append(Spacer(1, 20))
     
-    # --- CONTEÚDO ---
-    # Limpeza básica de caracteres que podem quebrar o PDF
-    texto_formatado = texto_parecer.replace("\n", "<br/>").replace("**", "<b>").replace("*", "•")
+    # --- TRATAMENTO DE TEXTO (CORREÇÃO DO ERRO) ---
+    # 1. Remove Emojis (PDFs simples não suportam fontes de emoji)
+    texto_limpo = texto_parecer.encode('ascii', 'ignore').decode('ascii')
     
+    # 2. Converte negritos do Markdown (**) para negritos do PDF (<b>)
+    # Usamos Regex para garantir que todos os pares sejam fechados
+    texto_formatado = re.sub(r'\*\*(.*?)\*\*', r'<b>\1</b>', texto_limpo)
+    
+    # 3. Converte quebras de linha
+    texto_formatado = texto_formatado.replace("\n", "<br/>")
+
     style_corpo = styles["Normal"]
-    style_corpo.fontSize = 11
-    style_corpo.leading = 14
+    style_corpo.fontSize = 10
+    style_corpo.leading = 14 # Espaçamento entre linhas
     
-    elementos.append(Paragraph(texto_formatado, style_corpo))
+    # Dividir o texto em parágrafos para evitar blocos gigantes que quebram a página
+    partes = texto_formatado.split("<br/><br/>")
+    for p in partes:
+        if p.strip():
+            try:
+                elementos.append(Paragraph(p, style_corpo))
+                elementos.append(Spacer(1, 8))
+            except:
+                # Caso algum caractere ainda falte, limpa mais uma vez
+                p_safe = re.sub(r'[<>&]', '', p)
+                elementos.append(Paragraph(p_safe, style_corpo))
+
     elementos.append(Spacer(1, 30))
     elementos.append(Paragraph("<hr/>", styles['Normal']))
-    elementos.append(Paragraph("<font size=9 color='gray'>Documento gerado automaticamente pelo Sistema CORE ESSENCE em 2026.</font>", styles['Normal']))
+    elementos.append(Paragraph("<font size=8 color='gray'>Este documento é uma análise técnica preliminar gerada por IA sob supervisão da CORE ESSENCE (2026).</font>", styles['Normal']))
 
     doc.build(elementos)
     buffer.seek(0)
