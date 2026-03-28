@@ -16,7 +16,7 @@ def extrair_texto_pdf(arquivo_pdf):
     return texto
 
 def analisar_estatuto(texto_estatuto):
-    model = genai.GenerativeModel('gemini-pro')
+    model = genai.GenerativeModel('gemini-1.5-flash')
     
     prompt = f"""
     Você é um consultor jurídico sênior especializado em Terceiro Setor e Gestão Governamental da consultoria CORE ESSENCE.
