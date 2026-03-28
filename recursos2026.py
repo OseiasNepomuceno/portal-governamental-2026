@@ -23,13 +23,20 @@ def carregar_dados_drive():
         planilha = [f for f in arquivos if f.endswith(('.xlsx', '.csv'))][0]
         caminho_final = os.path.join(extract_path, planilha)
         
-        if planilha.endswith('.xlsx'):
-            df = pd.read_excel(caminho_final)
-        else:
-            df = pd.read_csv(caminho_final, sep=';', encoding='latin1')
+        df = pd.read_excel(caminho_final) if planilha.endswith('.xlsx') else pd.read_csv(caminho_final, sep=';', encoding='latin1')
 
-        # Filtro de Ano (Baseado na Data de Início de Vigência ou Publicação se não houver coluna ANO)
-        # Como não vimos uma coluna "ANO" pura, vamos extrair da 'DATA PUBLICAÇÃO'
+        # --- LIMPEZA DE VALORES (Resolve o erro do 'f') ---
+        def limpar_valor(valor):
+            if isinstance(valor, str):
+                valor = valor.replace('R$', '').replace('.', '').replace(',', '.').strip()
+            return pd.to_numeric(valor, errors='coerce')
+
+        colunas_valor = ['VALOR CONVÊNIO', 'VALOR LIBERADO']
+        for col in colunas_valor:
+            if col in df.columns:
+                df[col] = df[col].apply(limpar_valor).fillna(0)
+
+        # Filtro de Ano 2026
         if 'DATA PUBLICAÇÃO' in df.columns:
             df['DATA PUBLICAÇÃO'] = pd.to_datetime(df['DATA PUBLICAÇÃO'], errors='coerce')
             df = df[df['DATA PUBLICAÇÃO'].dt.year == 2026]
@@ -47,7 +54,6 @@ st.markdown("---")
 df_radar = carregar_dados_drive()
 
 if df_radar is not None:
-    # Nomes exatos das colunas que você enviou
     col_mun = 'NOME MUNICÍPIO'
     col_valor = 'VALOR CONVÊNIO'
     col_liberado = 'VALOR LIBERADO'
@@ -61,17 +67,16 @@ if df_radar is not None:
         if municipio_sel != "Todos":
             df_final = df_radar[df_radar[col_mun] == municipio_sel]
 
-        # --- CARDS DE RESUMO FINANCEIRO ---
-        total_convenio = df_final[col_valor].sum()
-        total_liberado = df_final[col_liberado].sum()
+        # --- CARDS COM FORMATAÇÃO SEGURA ---
+        total_convenio = float(df_final[col_valor].sum())
+        total_liberado = float(df_final[col_liberado].sum())
         
         c1, c2, c3 = st.columns(3)
-        c1.metric("Total em Convênios", f"R$ {total_convenio:,.2f}")
-        c2.metric("Total Liberado", f"R$ {total_liberado:,.2f}")
+        # Formatação usando f-string padrão para evitar o erro anterior
+        c1.metric("Total em Convênios", f"R$ {total_convenio:,.2f}".replace(",", "X").replace(".", ",").replace("X", "."))
+        c2.metric("Total Liberado", f"R$ {total_liberado:,.2f}".replace(",", "X").replace(".", ",").replace("X", "."))
         c3.metric("Qtd. de Projetos", len(df_final))
 
         st.markdown("---")
         st.write(f"### Detalhamento: {municipio_sel}")
         st.dataframe(df_final, use_container_width=True)
-    else:
-        st.error(f"Coluna '{col_mun}' não encontrada. Verifique se o arquivo mudou.")
