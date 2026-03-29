@@ -1,26 +1,31 @@
 import streamlit as st
 
-# 1. Inicializa o estado de login se não existir
+# 1. Configuração da Página (Sempre a primeira linha de comando Streamlit)
+st.set_page_config(page_title="CORE ESSENCE - Portal 2026", layout="wide", page_icon="💎")
+
+# 2. Inicialização do Estado de Login (Cria a "chave" na memória)
 if "logado" not in st.session_state:
-    st.session_state.logado = True # Começa logado para seu teste atual
+    st.session_state.logado = True
 
-# 2. Lógica do Botão Sair
+# 3. Criação do Menu Lateral (Define a variável 'escolha' primeiro!)
+st.sidebar.image("logo.png", width=150)
+st.sidebar.title("💎 CORE ESSENCE")
+menu = ["📊 Radar de Recursos 2026", "📈 Radar de Emendas", "📑 Revisor de Estatuto (MROSC)", "🚪 Sair"]
+escolha = st.sidebar.radio("Navegação:", menu)
+
+# 4. Lógica de Segurança e Logout
 if escolha == "🚪 Sair":
-    st.session_state.logado = False # "Desliga" o sistema
+    st.session_state.logado = False
     st.info("Sessão encerrada com segurança. Até logo, Oseias!")
-    if st.button("Logar novamente"):
-        st.session_state.logado = True
-        st.rerun() # Reinicia o app
-    st.stop()
-
-# 3. Trava de Segurança: Se não estiver logado, não mostra o restante
-if not st.session_state.logado:
-    st.warning("Por favor, realize o login para acessar o portal.")
-    if st.button("Ir para tela de Login"):
+    if st.button("Novo Login"):
         st.session_state.logado = True
         st.rerun()
-    st.stop()
+    st.stop() # Interrompe o código aqui para quem saiu
 
+# 5. Trava de Segurança Geral
+if not st.session_state.logado:
+    st.warning("Acesso restrito. Por favor, faça login.")
+    st.stop()
 # --- LÓGICA DE NAVEGAÇÃO (CHAMANDO OS OUTROS ARQUIVOS) ---
 
 # --- LÓGICA DE NAVEGAÇÃO SEGURA ---
