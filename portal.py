@@ -1,10 +1,10 @@
 import streamlit as st
 import pandas as pd
 
-# 1. Configuração da Página (Sempre a primeira linha)
+# 1. Configuração da Página
 st.set_page_config(page_title="CORE ESSENCE - Portal 2026", layout="wide", page_icon="💎")
 
-# --- BLOCO DE CSS BLINDADO (ESCONDE MENU, HEADER E FOOTER) ---
+# --- BLOCO DE CSS (ESCONDE AS MARCAS DO STREAMLIT) ---
 hide_st_style = """
             <style>
             #MainMenu {visibility: hidden;}
@@ -13,11 +13,48 @@ hide_st_style = """
             [data-testid="stHeader"] {display: none;}
             [data-testid="stFooter"] {display: none;}
             .stAppDeployButton {display:none;}
-            /* Ajuste para o conteúdo não ficar colado no topo */
             .block-container {padding-top: 2rem;}
             </style>
             """
 st.markdown(hide_st_style, unsafe_allow_html=True)
+
+# --- FUNÇÃO DE LICENÇA ---
+def verificar_licenca(user_input, pass_input):
+    try:
+        sheet_id = st.secrets["ID_LICENCAS"]
+        url = f"https://docs.google.com/spreadsheets/d/{sheet_id}/export?format=csv"
+        df_licencas = pd.read_csv(url)
+        df_licencas['usuario'] = df_licencas['usuario'].astype(str).str.strip()
+        usuario_db = df_licencas[df_licencas['usuario'] == str(user_input).strip()]
+        if not usuario_db.empty:
+            senha_correta = str(usuario_db.iloc[0]['senha']).strip()
+            status = str(usuario_db.iloc[0]['status']).lower().strip()
+            if str(pass_input).strip() == senha_correta and status == "ativo":
+                return True, "Sucesso"
+        return False, "Acesso Negado ou Licença Expirada."
+    except Exception as e:
+        return False, f"Erro: {e}"
+
+# --- CONTROLE DE SESSÃO ---
+if "logado" not in st.session_state:
+    st.session_state.logado = False
+
+if not st.session_state.logado:
+    st.title("🔐 CORE ESSENCE - Acesso")
+    with st.form("login"):
+        u = st.text_input("Usuário")
+        p = st.text_input("Senha", type="password")
+        if st.form_submit_button("Entrar"):
+            ok, msg = verificar_licenca(u, p)
+            if ok:
+                st.session_state.logado = True
+                st.session_state.user = u
+                st.rerun()
+            else: st.error(msg)
+    st.stop()
+
+
+# ABAIXO DAQUI, CHAME SEUS MÓDULOS (import recursos2026, etc)
 
 # --- FUNÇÃO PARA VERIFICAR ACESSO NA PLANILHA ---
 def verificar_licenca(user_input, pass_input):
