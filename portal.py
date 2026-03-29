@@ -4,16 +4,19 @@ import pandas as pd
 # 1. Configuração da Página
 st.set_page_config(page_title="CORE ESSENCE - Portal 2026", layout="wide", page_icon="💎")
 
-# --- BLOCO DE CSS (ESCONDE AS MARCAS DO STREAMLIT) ---
+# --- CSS DE FORÇA BRUTA (LIMPEZA TOTAL) ---
 hide_st_style = """
             <style>
-            #MainMenu {visibility: hidden;}
-            footer {visibility: hidden;}
-            header {visibility: hidden;}
-            [data-testid="stHeader"] {display: none;}
-            [data-testid="stFooter"] {display: none;}
-            .stAppDeployButton {display:none;}
-            .block-container {padding-top: 2rem;}
+            #MainMenu {visibility: hidden; display: none !important;}
+            footer {visibility: hidden; display: none !important;}
+            header {visibility: hidden; display: none !important;}
+            [data-testid="stHeader"] {display: none !important;}
+            [data-testid="stToolbar"] {display: none !important;}
+            .stAppDeployButton {display:none !important;}
+            [data-testid="stStatusWidget"] {display:none !important;}
+            div[class^="viewerBadge"] {display: none !important;}
+            div[class*="viewerBadge"] {display: none !important;}
+            .block-container {padding-top: 0rem !important;}
             </style>
             """
 st.markdown(hide_st_style, unsafe_allow_html=True)
