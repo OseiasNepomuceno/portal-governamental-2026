@@ -1,22 +1,25 @@
 import streamlit as st
 
-# --- CONFIGURAÇÃO DA PÁGINA ---
-st.set_page_config(page_title="CORE ESSENCE - Portal 2026", layout="wide", page_icon="💎")
+# 1. Inicializa o estado de login se não existir
+if "logado" not in st.session_state:
+    st.session_state.logado = True # Começa logado para seu teste atual
 
-# --- ESTILIZAÇÃO DO MENU LATERAL ---
-st.sidebar.image("logo.png", width=150)
-st.sidebar.title("💎 CORE ESSENCE")
-st.sidebar.markdown("---")
+# 2. Lógica do Botão Sair
+if escolha == "🚪 Sair":
+    st.session_state.logado = False # "Desliga" o sistema
+    st.info("Sessão encerrada com segurança. Até logo, Oseias!")
+    if st.button("Logar novamente"):
+        st.session_state.logado = True
+        st.rerun() # Reinicia o app
+    st.stop()
 
-# Opções do Menu
-menu = [
-    "📊 Radar de Recursos 2026",
-    "📈 Radar de Emendas",
-    "📑 Revisor de Estatuto (MROSC)",
-    "🚪 Sair"
-]
-
-escolha = st.sidebar.radio("Navegação do Consultor:", menu)
+# 3. Trava de Segurança: Se não estiver logado, não mostra o restante
+if not st.session_state.logado:
+    st.warning("Por favor, realize o login para acessar o portal.")
+    if st.button("Ir para tela de Login"):
+        st.session_state.logado = True
+        st.rerun()
+    st.stop()
 
 # --- LÓGICA DE NAVEGAÇÃO (CHAMANDO OS OUTROS ARQUIVOS) ---
 
