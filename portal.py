@@ -1,33 +1,43 @@
 import streamlit as st
+import pandas as pd
 
-# 1. Configuração da Página
-st.set_page_config(page_title="CORE ESSENCE - Portal 2026", layout="wide", page_icon="💎")
-
-# --- SISTEMA DE AUTENTICAÇÃO ---
-# Inicializa o estado de login como falso se for o primeiro acesso
-if "logado" not in st.session_state:
-    st.session_state.logado = False
-
-def tela_de_login():
-    st.title("🔐 Acesso Restrito - CORE ESSENCE")
-    with st.form("login_form"):
-        usuario = st.text_input("Usuário")
-        senha = st.text_input("Senha", type="password")
-        botao_entrar = st.form_submit_button("Entrar no Portal")
+# --- FUNÇÃO PARA VERIFICAR ACESSO NA PLANILHA ---
+def verificar_licenca(user_input, pass_input):
+    try:
+        # Usa o gdown ou o link direto de exportação CSV da sua planilha
+        sheet_id = st.secrets["ID_LICENCAS"]
+        url = f"https://docs.google.com/spreadsheets/d/{sheet_id}/export?format=csv"
+        df_licencas = pd.read_csv(url)
         
-        if botao_entrar:
-            # VOCÊ PODE MUDAR A SENHA AQUI:
-            if usuario == "oseias" and senha == "core2026":
+        # Procura o usuário na planilha
+        usuario_db = df_licencas[df_licencas['usuario'] == user_input]
+        
+        if not usuario_db.empty:
+            senha_correta = str(usuario_db.iloc[0]['senha'])
+            status = str(usuario_db.iloc[0]['status']).lower()
+            
+            if pass_input == senha_correta and status == "ativo":
+                return True, "Sucesso"
+            elif status == "expirado":
+                return False, "Sua licença expirou. Entre em contato para renovar."
+        
+        return False, "Usuário ou senha incorretos."
+    except Exception as e:
+        return False, f"Erro de conexão com o servidor de licenças: {e}"
+
+# --- TELA DE LOGIN ATUALIZADA ---
+def tela_de_login():
+    st.title("🔐 CORE ESSENCE - Gestão de Acessos")
+    with st.form("login_form"):
+        u = st.text_input("Usuário").strip()
+        p = st.text_input("Senha", type="password").strip()
+        if st.form_submit_button("Acessar Portal"):
+            autorizado, mensagem = verificar_licenca(u, p)
+            if autorizado:
                 st.session_state.logado = True
-                st.success("Acesso autorizado! Carregando...")
                 st.rerun()
             else:
-                st.error("Usuário ou senha incorretos.")
-
-# --- LÓGICA DE BLOQUEIO ---
-if not st.session_state.logado:
-    tela_de_login()
-    st.stop() # Interrompe tudo e só mostra a tela de login
+                st.error(mensagem)
 
 # --- SE CHEGOU AQUI, O USUÁRIO ESTÁ LOGADO ---
 # Menu Lateral
