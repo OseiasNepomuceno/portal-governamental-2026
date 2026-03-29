@@ -51,6 +51,8 @@ def verificar_licenca(user_input, pass_input):
             senha_correta = str(usuario_db.iloc[0]['senha']).strip()
             status = str(usuario_db.iloc[0]['status']).lower().strip()
             if str(pass_input).strip() == senha_correta and status == "ativo":
+                        # ADICIONE A LINHA ABAIXO AQUI:
+                registrar_log(user_input, "Login realizado com sucesso")
                 return True, "Sucesso"
             elif status == "expirado":
                 return False, "Licença expirada."
