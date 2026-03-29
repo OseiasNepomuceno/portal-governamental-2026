@@ -1,31 +1,50 @@
 import streamlit as st
 
-# 1. Configuração da Página (Sempre a primeira linha de comando Streamlit)
+# 1. Configuração da Página
 st.set_page_config(page_title="CORE ESSENCE - Portal 2026", layout="wide", page_icon="💎")
 
-# 2. Inicialização do Estado de Login (Cria a "chave" na memória)
+# --- SISTEMA DE AUTENTICAÇÃO ---
+# Inicializa o estado de login como falso se for o primeiro acesso
 if "logado" not in st.session_state:
-    st.session_state.logado = True
+    st.session_state.logado = False
 
-# 3. Criação do Menu Lateral (Define a variável 'escolha' primeiro!)
+def tela_de_login():
+    st.title("🔐 Acesso Restrito - CORE ESSENCE")
+    with st.form("login_form"):
+        usuario = st.text_input("Usuário")
+        senha = st.text_input("Senha", type="password")
+        botao_entrar = st.form_submit_button("Entrar no Portal")
+        
+        if botao_entrar:
+            # VOCÊ PODE MUDAR A SENHA AQUI:
+            if usuario == "oseias" and senha == "core2026":
+                st.session_state.logado = True
+                st.success("Acesso autorizado! Carregando...")
+                st.rerun()
+            else:
+                st.error("Usuário ou senha incorretos.")
+
+# --- LÓGICA DE BLOQUEIO ---
+if not st.session_state.logado:
+    tela_de_login()
+    st.stop() # Interrompe tudo e só mostra a tela de login
+
+# --- SE CHEGOU AQUI, O USUÁRIO ESTÁ LOGADO ---
+# Menu Lateral
 st.sidebar.image("logo.png", width=150)
 st.sidebar.title("💎 CORE ESSENCE")
 menu = ["📊 Radar de Recursos 2026", "📈 Radar de Emendas", "📑 Revisor de Estatuto (MROSC)", "🚪 Sair"]
 escolha = st.sidebar.radio("Navegação:", menu)
 
-# 4. Lógica de Segurança e Logout
+# Lógica do Botão Sair
 if escolha == "🚪 Sair":
     st.session_state.logado = False
-    st.info("Sessão encerrada com segurança. Até logo, Oseias!")
-    if st.button("Novo Login"):
-        st.session_state.logado = True
+    st.info("Sessão encerrada com segurança.")
+    if st.button("Voltar para a tela de Login"):
         st.rerun()
-    st.stop() # Interrompe o código aqui para quem saiu
-
-# 5. Trava de Segurança Geral
-if not st.session_state.logado:
-    st.warning("Acesso restrito. Por favor, faça login.")
     st.stop()
+
+
 # --- LÓGICA DE NAVEGAÇÃO (CHAMANDO OS OUTROS ARQUIVOS) ---
 
 # --- LÓGICA DE NAVEGAÇÃO SEGURA ---
