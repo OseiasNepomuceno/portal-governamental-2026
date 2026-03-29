@@ -1,8 +1,22 @@
 import streamlit as st
 import pandas as pd
 
-# 1. Configuração da Página (Deve ser sempre a primeira coisa)
+# 1. Configuração da Página
 st.set_page_config(page_title="CORE ESSENCE - Portal 2026", layout="wide", page_icon="💎")
+
+# --- ESCONDER BOTÕES DO STREAMLIT (TOQUE PROFISSIONAL) ---
+hide_st_style = """
+            <style>
+            #MainMenu {visibility: hidden;}
+            footer {visibility: hidden;}
+            header {visibility: hidden;}
+            .stAppDeployButton {display:none;} /* Esconde o botão de Deploy */
+            </style>
+            """
+st.markdown(hide_st_style, unsafe_allow_html=True)
+
+# ... Resto do seu código (Função de licença, Login, etc) ...
+
 
 # --- FUNÇÃO PARA VERIFICAR ACESSO NA PLANILHA ---
 def verificar_licenca(user_input, pass_input):
