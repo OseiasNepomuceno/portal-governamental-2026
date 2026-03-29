@@ -8,3 +8,4 @@ reportlab
 google-generativeai
 PyPDF2
 python-docx
+gspread
