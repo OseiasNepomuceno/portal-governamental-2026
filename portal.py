@@ -1,22 +1,23 @@
 import streamlit as st
 import pandas as pd
 
+# 1. Configuração da Página (Deve ser sempre a primeira coisa)
+st.set_page_config(page_title="CORE ESSENCE - Portal 2026", layout="wide", page_icon="💎")
+
 # --- FUNÇÃO PARA VERIFICAR ACESSO NA PLANILHA ---
 def verificar_licenca(user_input, pass_input):
     try:
-        # Usa o gdown ou o link direto de exportação CSV da sua planilha
         sheet_id = st.secrets["ID_LICENCAS"]
         url = f"https://docs.google.com/spreadsheets/d/{sheet_id}/export?format=csv"
         df_licencas = pd.read_csv(url)
         
-        # Procura o usuário na planilha
-        usuario_db = df_licencas[df_licencas['usuario'] == user_input]
+        usuario_db = df_licencas[df_licencas['usuario'].astype(str) == str(user_input)]
         
         if not usuario_db.empty:
             senha_correta = str(usuario_db.iloc[0]['senha'])
             status = str(usuario_db.iloc[0]['status']).lower()
             
-            if pass_input == senha_correta and status == "ativo":
+            if str(pass_input) == senha_correta and status == "ativo":
                 return True, "Sucesso"
             elif status == "expirado":
                 return False, "Sua licença expirou. Entre em contato para renovar."
@@ -25,7 +26,11 @@ def verificar_licenca(user_input, pass_input):
     except Exception as e:
         return False, f"Erro de conexão com o servidor de licenças: {e}"
 
-# --- TELA DE LOGIN ATUALIZADA ---
+# --- INICIALIZAÇÃO DO ESTADO ---
+if "logado" not in st.session_state:
+    st.session_state.logado = False
+
+# --- TELA DE LOGIN ---
 def tela_de_login():
     st.title("🔐 CORE ESSENCE - Gestão de Acessos")
     with st.form("login_form"):
@@ -39,6 +44,11 @@ def tela_de_login():
             else:
                 st.error(mensagem)
 
+# --- TRAVA DE SEGURANÇA ---
+if not st.session_state.logado:
+    tela_de_login()
+    st.stop()
+
 # --- SE CHEGOU AQUI, O USUÁRIO ESTÁ LOGADO ---
 # Menu Lateral
 st.sidebar.image("logo.png", width=150)
@@ -46,28 +56,18 @@ st.sidebar.title("💎 CORE ESSENCE")
 menu = ["📊 Radar de Recursos 2026", "📈 Radar de Emendas", "📑 Revisor de Estatuto (MROSC)", "🚪 Sair"]
 escolha = st.sidebar.radio("Navegação:", menu)
 
-# --- LÓGICA DO BOTÃO SAIR ---
+# --- LÓGICA DO BOTÃO SAIR (CORRIGIDA) ---
 if escolha == "🚪 Sair":
-    # 1. Mudamos o estado para deslogado
     st.session_state.logado = False
+    st.info("Sessão encerrada com segurança. Até logo!")
     
-    # 2. Mostramos a mensagem de despedida
-    st.info("Sessão encerrada com segurança. Até logo, Oseias!")
-    
-    # 3. O Botão agora força o recarregamento do app
     if st.button("Voltar para a tela de Login"):
-        # Limpar o estado garante que o app volte para o início real
-        st.session_state.clear() 
+        st.session_state.clear() # Limpa TUDO para garantir o reset
         st.rerun()
     
-    # 4. Importante: Paramos a execução aqui para o menu não aparecer
     st.stop()
 
-
-# --- LÓGICA DE NAVEGAÇÃO (CHAMANDO OS OUTROS ARQUIVOS) ---
-
-# --- LÓGICA DE NAVEGAÇÃO SEGURA ---
-
+# --- NAVEGAÇÃO DOS MÓDULOS ---
 if escolha == "📊 Radar de Recursos 2026":
     try:
         import recursos2026
@@ -88,7 +88,3 @@ elif escolha == "📑 Revisor de Estatuto (MROSC)":
         revisor_estatuto.executar()
     except Exception as e:
         st.error(f"Erro ao carregar Revisor de Estatuto: {e}")
-
-elif escolha == "🚪 Sair":
-    st.info("Sessão encerrada com segurança. Até logo, Oseias!")
-    st.stop()
