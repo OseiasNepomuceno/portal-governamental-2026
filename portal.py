@@ -46,12 +46,21 @@ st.sidebar.title("💎 CORE ESSENCE")
 menu = ["📊 Radar de Recursos 2026", "📈 Radar de Emendas", "📑 Revisor de Estatuto (MROSC)", "🚪 Sair"]
 escolha = st.sidebar.radio("Navegação:", menu)
 
-# Lógica do Botão Sair
+# --- LÓGICA DO BOTÃO SAIR ---
 if escolha == "🚪 Sair":
+    # 1. Mudamos o estado para deslogado
     st.session_state.logado = False
-    st.info("Sessão encerrada com segurança.")
+    
+    # 2. Mostramos a mensagem de despedida
+    st.info("Sessão encerrada com segurança. Até logo, Oseias!")
+    
+    # 3. O Botão agora força o recarregamento do app
     if st.button("Voltar para a tela de Login"):
+        # Limpar o estado garante que o app volte para o início real
+        st.session_state.clear() 
         st.rerun()
+    
+    # 4. Importante: Paramos a execução aqui para o menu não aparecer
     st.stop()
 
 
