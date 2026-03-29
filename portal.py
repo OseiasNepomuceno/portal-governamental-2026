@@ -4,13 +4,27 @@ import pandas as pd
 # 1. Configuração da Página
 st.set_page_config(page_title="CORE ESSENCE - Portal 2026", layout="wide", page_icon="💎")
 
-# --- ESCONDER BOTÕES DO STREAMLIT (TOQUE PROFISSIONAL) ---
+# --- CSS PROFISSIONAL E VISÍVEL ---
 hide_st_style = """
             <style>
+            /* Esconde o menu de 3 linhas e o rodapé padrão */
             #MainMenu {visibility: hidden;}
             footer {visibility: hidden;}
+            
+            /* Esconde a barra de ferramentas superior (Deploy, Edit) */
             header {visibility: hidden;}
-            .stAppDeployButton {display:none;} /* Esconde o botão de Deploy */
+            [data-testid="stHeader"] {display: none;}
+            
+            /* Remove o espaço em branco exagerado no topo */
+            .block-container {
+                padding-top: 1rem;
+                padding-bottom: 1rem;
+            }
+
+            /* Garante que os títulos e textos fiquem visíveis */
+            h1, h2, h3, p, span {
+                visibility: visible !important;
+            }
             </style>
             """
 st.markdown(hide_st_style, unsafe_allow_html=True)
