@@ -1,89 +1,97 @@
 import streamlit as st
-import requests
 import pandas as pd
+import gdown
+import zipfile
+import os
+import requests
 
-# --- FUNÇÃO DE BUSCA NA API DE EMENDAS ---
+# --- FUNÇÃO 1: BUSCA NA API (PARA ANOS ANTERIORES) ---
 @st.cache_data(ttl=3600)
-def buscar_emendas_governo(ano, pagina=1):
+def buscar_emendas_api(ano):
     chave = st.secrets.get("chave-api-dados")
-    
-    if not chave:
-        st.error("🚨 Chave 'chave-api-dados' não encontrada nos Secrets.")
-        return []
-
+    if not chave: return []
     token = str(chave).strip().replace('"', '').replace("'", "")
     url = "https://api.portaldatransparencia.gov.br/api-de-dados/emendas"
+    headers = {"chave-api-dados": token, "Accept": "application/json"}
+    params = {"ano": ano, "pagina": 1}
+    try:
+        res = requests.get(url, headers=headers, params=params, timeout=20)
+        return res.json() if res.status_code == 200 else []
+    except: return []
+
+# --- FUNÇÃO 2: BUSCA NO DRIVE (PARA 2026 ATUALIZÁVEL) ---
+@st.cache_data(ttl=600, show_spinner="Sincronizando base manual do Transferegov...")
+def carregar_emendas_drive():
+    FILE_ID = st.secrets.get("ID_EMENDAS")
+    if not FILE_ID: return None
     
-    headers = {
-        "chave-api-dados": token,
-        "Accept": "application/json",
-        "User-Agent": "CoreEssence-Radar/1.0"
-    }
-    
-    params = {"ano": ano, "pagina": pagina}
+    url = f'https://drive.google.com/uc?id={FILE_ID}'
+    zip_output = 'emendas_manual.zip'
+    extract_path = 'emendas_temp'
     
     try:
-        res = requests.get(url, headers=headers, params=params, timeout=30)
-        if res.status_code == 200:
-            return res.json()
-        return []
-    except Exception:
-        return []
+        if os.path.exists(zip_output): os.remove(zip_output) # Força atualização
+        gdown.download(url, zip_output, quiet=True, fuzzy=True)
+        
+        with zipfile.ZipFile(zip_output, 'r') as zip_ref:
+            zip_ref.extractall(extract_path)
+        
+        arquivos = os.listdir(extract_path)
+        planilha = [f for f in arquivos if f.endswith('.csv')][0]
+        df = pd.read_csv(os.path.join(extract_path, planilha), sep=';', encoding='latin1', low_memory=False)
+        
+        # --- PADRONIZAÇÃO E CRIAÇÃO DA DATA ---
+        df.columns = [c.replace('ï»¿', '').strip().upper() for c in df.columns]
+        df['ANO_REFERENCIA'] = 2026  # CRIANDO A COLUNA DE DATA QUE FALTA
+        
+        return df
+    except Exception as e:
+        st.error(f"Erro no Drive: {e}")
+        return None
 
 def executar():
     st.title("🏛️ Radar de Emendas Parlamentares")
-    st.caption("CORE ESSENCE - Inteligência em Gestão Pública e Emendas")
+    st.caption("CORE ESSENCE - Inteligência Híbrida (API Gov + Transferegov)")
     st.markdown("---")
 
     with st.sidebar:
-        st.header("📍 Filtros de Emendas")
-        ano_sel = st.selectbox("Ano da Emenda", [2026, 2025, 2024, 2023], index=2)
-        btn_buscar = st.button("🔍 Consultar Volume de Dados")
+        st.header("📍 Filtros")
+        ano_sel = st.selectbox("Ano de Referência", [2026, 2025, 2024], index=0)
+        btn_buscar = st.button("🔍 Rastrear Recursos")
 
     if btn_buscar:
-        with st.spinner(f"🚀 Core Essence rastreando múltiplas páginas de {ano_sel}..."):
-            # --- BUSCA MULTI-PÁGINAS (TURBO) ---
-            todas_emendas = []
-            for p in range(1, 4): # Busca as páginas 1, 2 e 3
-                dados_pg = buscar_emendas_governo(ano_sel, pagina=p)
-                if dados_pg:
-                    todas_emendas.extend(dados_pg)
+        df_final = pd.DataFrame()
+        
+        if ano_sel == 2026:
+            # BUSCA NO SEU ARQUIVO MANUAL DO DRIVE
+            df_final = carregar_emendas_drive()
+            col_valor = 'VALOR_REPASSE_PROPOSTA_EMENDA'
+            col_autor = 'NOME_PARLAMENTAR'
+        else:
+            # BUSCA NA API OFICIAL
+            dados = buscar_emendas_api(ano_sel)
+            if dados:
+                df_final = pd.DataFrame(dados)
+                col_valor = 'valorEmpenhado'
+                col_autor = 'nomeAutor'
+
+        if df_final is not None and not df_final.empty:
+            # --- LIMPEZA DE VALORES ---
+            df_final[col_valor] = df_final[col_valor].astype(str).str.replace('.', '', regex=False).str.replace(',', '.', regex=False)
+            df_final[col_valor] = pd.to_numeric(df_final[col_valor], errors='coerce').fillna(0)
+
+            # --- MÉTRICAS ---
+            total = df_final[col_valor].sum()
+            st.metric(f"Total em Emendas ({ano_sel})", f"R$ {total:,.2f}".replace(",", "X").replace(".", ",").replace("X", "."))
+
+            # --- GRÁFICO ---
+            st.subheader(f"📊 Top Autores - {ano_sel}")
+            chart_data = df_final.groupby(col_autor)[col_valor].sum().sort_values(ascending=False).head(10)
+            st.bar_chart(chart_data)
             
-            if todas_emendas:
-                df = pd.DataFrame(todas_emendas)
-                
-                # --- TRATAMENTO DE VALORES ---
-                colunas_valor = ['valorEmpenhado', 'valorLiquidado', 'valorPago']
-                for col in colunas_valor:
-                    if col in df.columns:
-                        df[col] = df[col].astype(str).str.replace('.', '', regex=False)
-                        df[col] = df[col].str.replace(',', '.', regex=False)
-                        df[col] = pd.to_numeric(df[col], errors='coerce').fillna(0)
-
-                # --- MÉTRICAS CONSOLIDADAS ---
-                total_empenhado = df['valorEmpenhado'].sum()
-                total_pago = df['valorPago'].sum()
-                
-                m1, m2 = st.columns(2)
-                v_emp = f"R$ {total_empenhado:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
-                v_pag = f"R$ {total_pago:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
-                
-                m1.metric("Total Reservado (Empenhado)", v_emp)
-                m2.metric("Total na Conta (Pago)", v_pag)
-
-                # --- GRÁFICO ---
-                st.subheader("📊 Distribuição de Recursos (Top 10 Autores)")
-                if 'nomeAutor' in df.columns:
-                    chart_data = df.groupby('nomeAutor')['valorEmpenhado'].sum().sort_values(ascending=False).head(10)
-                    st.bar_chart(chart_data)
-
-                # --- TABELA ---
-                st.subheader(f"📋 Listagem Consolidada ({len(df)} registros)")
-                cols_exibir = ['numeroEmenda', 'nomeAutor', 'tipoEmenda', 'funcao', 'valorEmpenhado', 'valorPago']
-                cols_finais = [c for c in cols_exibir if c in df.columns]
-                st.dataframe(df[cols_finais], use_container_width=True)
-            else:
-                st.info(f"🛰️ Radar em vigília: Sem dados públicos para {ano_sel} no momento.")
+            st.dataframe(df_final, use_container_width=True)
+        else:
+            st.info("Aguardando atualização de dados para este período.")
 
 if __name__ == "__main__":
     executar()
