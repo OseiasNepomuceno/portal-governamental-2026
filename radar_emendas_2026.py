@@ -59,24 +59,28 @@ def executar():
         with st.spinner(f"Rastreando emendas de {ano_sel}..."):
             dados = buscar_emendas_governo(ano_sel)
             
-            if dados:
+                          
+               if dados:
                 df = pd.DataFrame(dados)
                 
-                # --- TRATAMENTO DE VALORES ---
-                # A API retorna valores como string, convertemos para número
+                # --- NOVO TRATAMENTO DE VALORES (MAIS FORTE) ---
                 colunas_valor = ['valorEmpenhado', 'valorLiquidado', 'valorPago']
                 for col in colunas_valor:
                     if col in df.columns:
-                        df[col] = pd.to_numeric(df[col].str.replace(',', '.'), errors='coerce').fillna(0)
+                        # Remove pontos, troca vírgula por ponto e converte para número
+                        df[col] = df[col].astype(str).str.replace('.', '', regex=False)
+                        df[col] = df[col].str.replace(',', '.', regex=False)
+                        df[col] = pd.to_numeric(df[col], errors='coerce').fillna(0)
 
                 # --- MÉTRICAS ---
                 total_empenhado = df['valorEmpenhado'].sum()
                 total_pago = df['valorPago'].sum()
                 
                 m1, m2 = st.columns(2)
+                # Formatação para padrão Brasileiro (R$)
                 m1.metric("Total Reservado (Empenhado)", f"R$ {total_empenhado:,.2f}".replace(",", "X").replace(".", ",").replace("X", "."))
                 m2.metric("Total na Conta (Pago)", f"R$ {total_pago:,.2f}".replace(",", "X").replace(".", ",").replace("X", "."))
-
+                   
                 # --- GRÁFICO DE AUTORES ---
                 st.subheader("📊 Top 10 Autores de Emendas (Volume R$)")
                 if 'nomeAutor' in df.columns:
