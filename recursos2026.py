@@ -10,44 +10,42 @@ import datetime
 st.set_page_config(page_title="Radar de Recursos | Core Essence", page_icon="🛰️", layout="wide")
 
 # --- FUNÇÃO DE BUSCA NA API (PURA E DIRETA) ---
-@st.cache_data(ttl=3600)
+@st.cache_data(ttl=60)
 def buscar_dados_governo(codigo_ibge, ano, mes):
-    chave = st.secrets.get("PORTAL_TRANSPARENCIA_KEY")
+    # Tenta ler a chave de 3 formas diferentes (Segurança máxima)
+    chave = st.secrets.get("chave-api-dados") or \
+            st.secrets.get("chave-api-dados") or \
+            st.secrets.get("default", {}).get("chave-api-dados")
+
     if not chave:
-        st.error("🚨 Chave não encontrada.")
+        # Se mesmo assim não achar, vamos listar o que o Streamlit ESTÁ vendo
+        chaves_vistas = list(st.secrets.to_dict().keys())
+        st.error(f"🚨 O Streamlit não encontrou a chave. Ele só consegue ver estas chaves: {chaves_vistas}")
         return []
 
-    token = str(chave).strip()
+    token = str(chave).strip().replace('"', '').replace("'", "")
     
-    # AJUSTE DE FORMATO: O governo prefere MM/AAAA para transferências
-    data_formatada = f"{mes}/{ano}" 
-    
+    # Formato MM/AAAA conforme a regra da CGU
+    data_formatada = f"{mes}/{ano}"
     url = "https://api.portaldatransparencia.gov.br/api-de-dados/transferencias/por-municipio"
     
     headers = {
         "chave-api-dados": token,
         "Accept": "application/json",
-        "User-Agent": "Mozilla/5.0" 
+        "User-Agent": "CoreEssence-Radar/1.0"
     }
     
-    # Parâmetros com a data formatada corretamente
-    params = {
-        "codigoIbge": codigo_ibge,
-        "mesAno": data_formatada,
-        "pagina": 1
-    }
+    params = {"codigoIbge": codigo_ibge, "mesAno": data_formatada, "pagina": 1}
     
     try:
         res = requests.get(url, headers=headers, params=params, timeout=25)
-        
         if res.status_code == 200:
             return res.json()
         elif res.status_code == 403:
-            st.error(f"🚫 Erro 403: Tentativa com data {data_formatada} negada.")
-            st.info("Isso confirma que o Token está sendo enviado, mas o servidor recusa a requisição.")
+            st.error("🚫 Erro 403: Acesso Negado pelo Governo. Verifique a autorização no portal.")
             return []
         else:
-            st.error(f"Erro {res.status_code} na API.")
+            st.error(f"Erro {res.status_code} na API do Governo.")
             return []
     except Exception as e:
         st.error(f"Erro de Conexão: {e}")
