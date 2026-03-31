@@ -40,12 +40,18 @@ def executar():
         ano_sel = st.selectbox("Ano da Emenda", [2026, 2025, 2024, 2023], index=2)
         btn_buscar = st.button("🔍 Consultar Emendas")
 
-    if btn_buscar:
-        with st.spinner(f"Rastreando emendas de {ano_sel}..."):
-            dados = buscar_emendas_governo(ano_sel)
+   if btn_buscar:
+        with st.spinner(f"Rastreando volume massivo de emendas de {ano_sel}..."):
+            todas_emendas = []
+            # Vamos buscar as 3 primeiras páginas para ter mais dados no gráfico
+            for p in range(1, 4): 
+                dados_pg = buscar_emendas_governo(ano_sel, pagina=p)
+                if dados_pg:
+                    todas_emendas.extend(dados_pg)
             
-            if dados:
-                df = pd.DataFrame(dados)
+            if todas_emendas:
+                df = pd.DataFrame(todas_emendas)
+                # ... restante do seu código de tratamento ...
                 
                 # --- TRATAMENTO DE VALORES (CORRIGIDO PARA SAIR DO R$ 0,00) ---
                 colunas_valor = ['valorEmpenhado', 'valorLiquidado', 'valorPago']
