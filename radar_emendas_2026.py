@@ -21,32 +21,39 @@ def buscar_emendas_api(ano):
 
 # --- FUNÇÃO 2: BUSCA NO DRIVE (PARA 2026 ATUALIZÁVEL) ---
 @st.cache_data(ttl=600, show_spinner="Sincronizando base manual do Transferegov...")
+
 def carregar_emendas_drive():
     FILE_ID = st.secrets.get("ID_EMENDAS")
-    if not FILE_ID: return None
+    if not FILE_ID: 
+        st.error("ID_EMENDAS não encontrado nos Secrets.")
+        return None
     
-    url = f'https://drive.google.com/uc?id={FILE_ID}'
-    zip_output = 'emendas_manual.zip'
-    extract_path = 'emendas_temp'
+    # URL configurada para download direto de arquivo CSV
+    url = f'https://drive.google.com/uc?export=download&id={FILE_ID}'
+    output_csv = 'dados_2026_direto.csv'
     
     try:
-        if os.path.exists(zip_output): os.remove(zip_output) # Força atualização
-        gdown.download(url, zip_output, quiet=True, fuzzy=True)
+        # Remove versão antiga para garantir dados novos
+        if os.path.exists(output_csv): 
+            os.remove(output_csv)
         
-        with zipfile.ZipFile(zip_output, 'r') as zip_ref:
-            zip_ref.extractall(extract_path)
+        # Download do CSV
+        gdown.download(url, output_csv, quiet=False, fuzzy=True)
         
-        arquivos = os.listdir(extract_path)
-        planilha = [f for f in arquivos if f.endswith('.csv')][0]
-        df = pd.read_csv(os.path.join(extract_path, planilha), sep=';', encoding='latin1', low_memory=False)
+        if not os.path.exists(output_csv):
+            st.error("Não foi possível baixar o arquivo. Verifique o ID e as permissões.")
+            return None
+
+        # Leitura do CSV (Ajustado para o padrão do governo: latin1 e ponto-e-vírgula)
+        df = pd.read_csv(output_csv, sep=';', encoding='latin1', low_memory=False)
         
-        # --- PADRONIZAÇÃO E CRIAÇÃO DA DATA ---
+        # Limpeza e Padronização
         df.columns = [c.replace('ï»¿', '').strip().upper() for c in df.columns]
-        df['ANO_REFERENCIA'] = 2026  # CRIANDO A COLUNA DE DATA QUE FALTA
+        df['ANO_REFERENCIA'] = 2026
         
         return df
     except Exception as e:
-        st.error(f"Erro no Drive: {e}")
+        st.error(f"Erro ao processar CSV do Drive: {e}")
         return None
 
 def executar():
