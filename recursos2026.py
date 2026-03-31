@@ -24,10 +24,10 @@ def buscar_dados_governo(codigo_ibge, mes_ano):
     
     url = "https://api.portaldatransparencia.gov.br/api-de-dados/transferencias/por-municipio"
     
-    headers = {
+   headers = {
         "chave-api-dados": token,
-        "Accept": "application/json",
-        "User-Agent": "CoreEssence/1.0"
+        "Accept": "*/*", # Mudamos para aceitar qualquer resposta
+        "User-Agent": "PostmanRuntime/7.26.8" # Simulando uma ferramenta de teste padrão
     }
     
     params = {"codigoIbge": codigo_ibge, "mesAno": mes_ano, "pagina": 1}
