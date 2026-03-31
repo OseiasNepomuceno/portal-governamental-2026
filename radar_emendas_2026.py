@@ -51,7 +51,8 @@ def executar():
     # --- PAINEL DE FILTROS ---
     with st.sidebar:
         st.header("📍 Filtros de Emendas")
-        ano_sel = st.selectbox("Ano da Emenda", [2026, 2025, 2024], index=0)
+        # No radar_emendas_2026.py, altere esta linha:
+        ano_sel = st.selectbox("Ano da Emenda", [2026, 2025, 2024, 2023, 2022], index=2)
         btn_buscar = st.button("🔍 Consultar Emendas")
 
     if btn_buscar:
