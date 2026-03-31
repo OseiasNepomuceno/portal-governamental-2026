@@ -27,7 +27,8 @@ def buscar_dados_governo(codigo_ibge, ano, mes):
     
     url = "https://api.portaldatransparencia.gov.br/api-de-dados/transferencias/por-municipio"
     
-   headers = {
+    # CORREÇÃO DE IDENTAÇÃO AQUI (Linha 30)
+    headers = {
         "chave-api-dados": token,
         "Accept": "application/json",
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
@@ -47,7 +48,7 @@ def buscar_dados_governo(codigo_ibge, ano, mes):
             return res.json()
         elif res.status_code == 403:
             st.error(f"🚫 Erro 403: Acesso negado pelo Governo para a data {data_formatada}.")
-            st.info("Sua chave foi reconhecida, mas o servidor do governo ainda está processando a autorização. Tente novamente em alguns minutos.")
+            st.info("Sua chave foi reconhecida, mas o servidor do governo ainda está processando a autorização.")
             return []
         else:
             st.error(f"Erro {res.status_code} na API Federal. Verifique os parâmetros.")
@@ -70,7 +71,6 @@ def executar():
         # Padrão: Presidente Prudente (3541406)
         ibge = st.text_input("Código IBGE do Município", value="3541406")
         ano = st.selectbox("Ano", [2026, 2025, 2024], index=0)
-        # Sugestão: Iniciar em Janeiro (01) para garantir dados consolidados
         mes = st.selectbox("Mês", [f"{i:02d}" for i in range(1, 13)], index=0)
         
         btn_radar = st.button("Rastrear Agora")
@@ -82,7 +82,6 @@ def executar():
             if resultados:
                 df = pd.DataFrame(resultados)
                 
-                # Garante que a coluna 'valor' seja numérica
                 if 'valor' in df.columns:
                     df['valor'] = pd.to_numeric(df['valor'], errors='coerce').fillna(0)
                 
@@ -91,15 +90,12 @@ def executar():
                 st.success("✅ Dados obtidos com sucesso!")
                 
                 col1, col2 = st.columns(2)
-                # Formatação de moeda brasileira (R$)
                 valor_formatado = f"R$ {total:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
                 col1.metric("Total Identificado", valor_formatado)
                 col2.metric("Nº de Repasses", len(df))
 
                 st.subheader("📋 Detalhamento das Transferências")
-                # Filtrando apenas as colunas mais importantes para o consultor
                 colunas_vistas = ['tipoTransferencia', 'favorecido', 'valor', 'origemRecurso']
-                # Verifica quais colunas realmente existem no retorno da API
                 colunas_finais = [c for c in colunas_vistas if c in df.columns]
                 
                 st.dataframe(df[colunas_finais], use_container_width=True)
