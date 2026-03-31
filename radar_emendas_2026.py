@@ -1,104 +1,117 @@
 import streamlit as st
 import pandas as pd
 import gdown
-import zipfile
 import os
-import requests
 
-# --- FUNÇÃO 1: BUSCA NA API (PARA ANOS ANTERIORES) ---
-@st.cache_data(ttl=3600)
-def buscar_emendas_api(ano):
-    chave = st.secrets.get("chave-api-dados")
-    if not chave: return []
-    token = str(chave).strip().replace('"', '').replace("'", "")
-    url = "https://api.portaldatransparencia.gov.br/api-de-dados/emendas"
-    headers = {"chave-api-dados": token, "Accept": "application/json"}
-    params = {"ano": ano, "pagina": 1}
-    try:
-        res = requests.get(url, headers=headers, params=params, timeout=20)
-        return res.json() if res.status_code == 200 else []
-    except: return []
+# --- DICIONÁRIO DE ARQUIVOS ---
+FONTES_DADOS = {
+    "Visão Geral": "ID_EMENDAS_GERAL",
+    "Por Favorecido (Quem recebe)": "ID_EMENDAS_FAVORECIDO",
+    "Convênios (Detalhado)": "ID_EMENDAS_CONVENIOS"
+}
 
-# --- FUNÇÃO 2: BUSCA NO DRIVE (PARA 2026 ATUALIZÁVEL) ---
-@st.cache_data(ttl=600, show_spinner="Sincronizando base manual do Transferegov...")
-
-def carregar_emendas_drive():
-    FILE_ID = st.secrets.get("ID_EMENDAS")
-    if not FILE_ID: 
-        st.error("ID_EMENDAS não encontrado nos Secrets.")
+@st.cache_data(ttl=600, show_spinner="Sincronizando base de dados...")
+def carregar_dados_drive(id_secret):
+    file_id = st.secrets.get(id_secret)
+    if not file_id:
+        st.error(f"Configuração {id_secret} não encontrada.")
         return None
     
-    # URL configurada para download direto de arquivo CSV
-    url = f'https://drive.google.com/uc?export=download&id={FILE_ID}'
-    output_csv = 'dados_2026_direto.csv'
+    url = f'https://drive.google.com/uc?export=download&id={file_id}'
+    output = f"{id_secret}.csv"
     
     try:
-        # Remove versão antiga para garantir dados novos
-        if os.path.exists(output_csv): 
-            os.remove(output_csv)
+        if os.path.exists(output): os.remove(output)
+        gdown.download(url, output, quiet=False, fuzzy=True)
         
-        # Download do CSV
-        gdown.download(url, output_csv, quiet=False, fuzzy=True)
-        
-        if not os.path.exists(output_csv):
-            st.error("Não foi possível baixar o arquivo. Verifique o ID e as permissões.")
-            return None
-
-        # Leitura do CSV (Ajustado para o padrão do governo: latin1 e ponto-e-vírgula)
-        df = pd.read_csv(output_csv, sep=';', encoding='latin1', low_memory=False)
-        
-        # Limpeza e Padronização
+        # Leitura com tratamento de encoding do Governo
+        df = pd.read_csv(output, sep=';', encoding='latin1', low_memory=False)
         df.columns = [c.replace('ï»¿', '').strip().upper() for c in df.columns]
-        df['ANO_REFERENCIA'] = 2026
         
+        # --- LÓGICA DE DATA ---
+        # Como o CSV não tem data, vamos simular para o filtro funcionar
+        # Se houver uma coluna de data real no arquivo, o código abaixo deve ser ajustado
+        if 'ANO' not in df.columns:
+            df['ANO'] = 2026
+        if 'MES' not in df.columns:
+            # Simulando meses para demonstração, ou você pode extrair de colunas de registro
+            df['MES'] = "Janeiro" 
+            
         return df
     except Exception as e:
-        st.error(f"Erro ao processar CSV do Drive: {e}")
+        st.error(f"Erro ao carregar {id_secret}: {e}")
         return None
 
 def executar():
-    st.title("🏛️ Radar de Emendas Parlamentares")
-    st.caption("CORE ESSENCE - Inteligência Híbrida (API Gov + Transferegov)")
+    st.title("🏛️ Radar de Emendas Parlamentares 2026")
+    st.caption("CORE ESSENCE - Inteligência Governamental e Análise Orçamentária")
     st.markdown("---")
 
+    # --- MENU LATERAL (FILTROS) ---
     with st.sidebar:
-        st.header("📍 Filtros")
-        ano_sel = st.selectbox("Ano de Referência", [2026, 2025, 2024], index=0)
-        btn_buscar = st.button("🔍 Rastrear Recursos")
-
-    if btn_buscar:
-        df_final = pd.DataFrame()
+        st.header("🔍 Filtros de Busca")
         
-        if ano_sel == 2026:
-            # BUSCA NO SEU ARQUIVO MANUAL DO DRIVE
-            df_final = carregar_emendas_drive()
-            col_valor = 'VALOR_REPASSE_PROPOSTA_EMENDA'
-            col_autor = 'NOME_PARLAMENTAR'
-        else:
-            # BUSCA NA API OFICIAL
-            dados = buscar_emendas_api(ano_sel)
-            if dados:
-                df_final = pd.DataFrame(dados)
-                col_valor = 'valorEmpenhado'
-                col_autor = 'nomeAutor'
+        # Filtro 1: Fonte de Dados
+        fonte_sel = st.selectbox("Selecione a Visão:", list(FONTES_DADOS.keys()))
+        
+        # Filtro 2: Ano
+        ano_sel = st.selectbox("Ano", [2026, 2025, 2024], index=0)
+        
+        # Filtro 3: Mês
+        meses = ["Todos", "Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", 
+                 "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"]
+        mes_sel = st.selectbox("Mês", meses)
+        
+        btn_atualizar = st.button("🚀 Aplicar Filtros")
 
-        if df_final is not None and not df_final.empty:
-            # --- LIMPEZA DE VALORES ---
-            df_final[col_valor] = df_final[col_valor].astype(str).str.replace('.', '', regex=False).str.replace(',', '.', regex=False)
-            df_final[col_valor] = pd.to_numeric(df_final[col_valor], errors='coerce').fillna(0)
-
-            # --- MÉTRICAS ---
-            total = df_final[col_valor].sum()
-            st.metric(f"Total em Emendas ({ano_sel})", f"R$ {total:,.2f}".replace(",", "X").replace(".", ",").replace("X", "."))
-
-            # --- GRÁFICO ---
-            st.subheader(f"📊 Top Autores - {ano_sel}")
-            chart_data = df_final.groupby(col_autor)[col_valor].sum().sort_values(ascending=False).head(10)
-            st.bar_chart(chart_data)
+    if btn_atualizar:
+        id_chave = FONTES_DADOS[fonte_sel]
+        df = carregar_dados_drive(id_chave)
+        
+        if df is not None:
+            # --- APLICANDO FILTROS NO DATAFRAME ---
+            df_filt = df[df['ANO'] == ano_sel]
             
-            st.dataframe(df_final, use_container_width=True)
-        else:
-            st.info("Aguardando atualização de dados para este período.")
+            if mes_sel != "Todos":
+                # Nota: Certifique-se que seu CSV tenha algo que identifique o mês
+                if 'MES' in df_filt.columns:
+                    df_filt = df_filt[df_filt['MES'] == mes_sel]
+
+            # --- ÁREA DE RESULTADOS (LADO DIREITO) ---
+            if not df_filt.empty:
+                st.subheader(f"📊 Resultados: {fonte_sel} ({mes_sel}/{ano_sel})")
+                
+                # Identificando colunas dinamicamente para o gráfico
+                col_valor = ""
+                for c in ['VALOR_REPASSE_PROPOSTA_EMENDA', 'VALOR_EMENDA', 'VALOR_CONVENIO']:
+                    if c in df_filt.columns:
+                        col_valor = c
+                        break
+                
+                col_autor = ""
+                for c in ['NOME_PARLAMENTAR', 'AUTOR', 'NOME_AUTOR']:
+                    if c in df_filt.columns:
+                        col_autor = c
+                        break
+
+                if col_valor and col_autor:
+                    # Limpeza de valor
+                    df_filt[col_valor] = df_filt[col_valor].astype(str).str.replace('.', '', regex=False).str.replace(',', '.', regex=False)
+                    df_filt[col_valor] = pd.to_numeric(df_filt[col_valor], errors='coerce').fillna(0)
+                    
+                    # Métricas
+                    total = df_filt[col_valor].sum()
+                    m1, m2 = st.columns(2)
+                    m1.metric("Volume Total", f"R$ {total:,.2f}".replace(",", "X").replace(".", ",").replace("X", "."))
+                    m2.metric("Qtd. de Registros", len(df_filt))
+                    
+                    # Gráfico
+                    st.bar_chart(df_filt.groupby(col_autor)[col_valor].sum().sort_values(ascending=False).head(10))
+                
+                st.write("### 📋 Dados Detalhados")
+                st.dataframe(df_filt, use_container_width=True)
+            else:
+                st.info(f"Nenhum dado encontrado para {mes_sel}/{ano_sel} nesta visão.")
 
 if __name__ == "__main__":
     executar()
