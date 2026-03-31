@@ -10,51 +10,43 @@ import datetime
 st.set_page_config(page_title="Radar de Recursos | Core Essence", page_icon="🛰️", layout="wide")
 
 # --- FUNÇÃO DE BUSCA NA API (PURA E DIRETA) ---
-@st.cache_data(ttl=3600)
+@st.cache_data(ttl=60) # Cache curto de 1 minuto para teste
 def buscar_dados_governo(codigo_ibge, mes_ano):
-    # 1. Busca a chave e remove TUDO o que não for letra ou número
-    chave_raw = st.secrets.get("PORTAL_TRANSPARENCIA_KEY")
+    # Forçamos a leitura da nova chave
+    chave = st.secrets.get("PORTAL_TRANSPARENCIA_KEY")
     
-    if not chave_raw:
-        st.error("🚨 Chave não encontrada nos Secrets!")
+    if not chave:
+        st.error("🚨 O Streamlit ainda não 'leu' a nova chave nos Secrets. Verifique se clicou em SAVE.")
         return []
 
-    # Limpeza total: remove espaços, aspas e quebras de linha
-    token_limpo = "".join(chave_raw.split()).replace('"', '').replace("'", "")
+    # Limpeza total de caracteres invisíveis
+    token = str(chave).strip()
     
     url = "https://api.portaldatransparencia.gov.br/api-de-dados/transferencias/por-municipio"
     
-    # Header exatamente como solicitado no e-mail: "chave-api-dados"
     headers = {
-        "chave-api-dados": token_limpo,
-        "Accept": "application/json"
+        "chave-api-dados": token,
+        "Accept": "application/json",
+        "User-Agent": "CoreEssence/1.0"
     }
     
-    params = {
-        "codigoIbge": codigo_ibge, 
-        "mesAno": mes_ano, 
-        "pagina": 1
-    }
+    params = {"codigoIbge": codigo_ibge, "mesAno": mes_ano, "pagina": 1}
     
     try:
-        # Aumentamos o timeout para 30 segundos
-        res = requests.get(url, headers=headers, params=params, timeout=30)
+        res = requests.get(url, headers=headers, params=params, timeout=20)
         
         if res.status_code == 200:
             return res.json()
         elif res.status_code == 403:
-            st.error(f"🚫 Erro 403 (Acesso Negado)")
-            st.info(f"O servidor do Governo reconheceu a chave finalizada em '...{token_limpo[-4:]}', mas negou o acesso.")
-            st.markdown("---")
-            st.warning("👉 **Ação Necessária:** Tente entrar no site da API novamente e veja se há algum aviso de 'Chave Suspensa' ou se o limite diário foi atingido (mesmo sem usar).")
+            st.error(f"🚫 Erro 403: O Governo recebeu a chave mas negou o acesso.")
+            st.info("Isso pode ser porque a chave 'eece77...' ainda está sendo propagada nos servidores do governo. Tente novamente em 15 minutos.")
             return []
         else:
-            st.error(f"Erro {res.status_code} vindo do Governo.")
+            st.error(f"Erro {res.status_code} - Verifique os parâmetros.")
             return []
     except Exception as e:
-        st.error(f"Falha de conexão: {e}")
+        st.error(f"Erro de Conexão: {e}")
         return []
-
 def executar():
     st.title("🛰️ Radar de Recursos Governamentais")
     st.caption("CORE ESSENCE - Inteligência em Dados Públicos (Via API Federal)")
