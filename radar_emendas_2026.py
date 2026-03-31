@@ -3,9 +3,9 @@ import pandas as pd
 import gdown
 import os
 
-# --- DICIONÁRIO DE ARQUIVOS ---
+# --- CONFIGURAÇÃO DE FONTES (IDs do Drive) ---
 FONTES_DADOS = {
-    "Visão Geral": "ID_EMENDAS_GERAL",
+    "Visão Geral (Emendas)": "ID_EMENDAS_GERAL",
     "Por Favorecido (Quem recebe)": "ID_EMENDAS_FAVORECIDO",
     "Convênios (Detalhado)": "ID_EMENDAS_CONVENIOS"
 }
@@ -14,7 +14,7 @@ FONTES_DADOS = {
 def carregar_dados_drive(id_secret):
     file_id = st.secrets.get(id_secret)
     if not file_id:
-        st.error(f"Configuração {id_secret} não encontrada.")
+        st.error(f"Configuração {id_secret} não encontrada nos Secrets.")
         return None
     
     url = f'https://drive.google.com/uc?export=download&id={file_id}'
@@ -24,94 +24,99 @@ def carregar_dados_drive(id_secret):
         if os.path.exists(output): os.remove(output)
         gdown.download(url, output, quiet=False, fuzzy=True)
         
-        # Leitura com tratamento de encoding do Governo
         df = pd.read_csv(output, sep=';', encoding='latin1', low_memory=False)
         df.columns = [c.replace('ï»¿', '').strip().upper() for c in df.columns]
         
-        # --- LÓGICA DE DATA ---
-        # Como o CSV não tem data, vamos simular para o filtro funcionar
-        # Se houver uma coluna de data real no arquivo, o código abaixo deve ser ajustado
-        if 'ANO' not in df.columns:
-            df['ANO'] = 2026
-        if 'MES' not in df.columns:
-            # Simulando meses para demonstração, ou você pode extrair de colunas de registro
-            df['MES'] = "Janeiro" 
+        # Garantir que existam colunas de tempo (Simulado se não houver no CSV)
+        if 'ANO' not in df.columns: df['ANO'] = 2026
+        # Se o seu CSV tiver uma coluna de data, podemos extrair o mês real aqui
+        if 'MES' not in df.columns: df['MES'] = "Janeiro" 
             
         return df
     except Exception as e:
-        st.error(f"Erro ao carregar {id_secret}: {e}")
+        st.error(f"Erro ao carregar dados: {e}")
         return None
 
+def formatar_brl(valor):
+    """Formata número para o padrão de moeda R$ 1.234,56"""
+    return f"R$ {valor:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+
 def executar():
-    st.title("🏛️ Radar de Emendas Parlamentares 2026")
-    st.caption("CORE ESSENCE - Inteligência Governamental e Análise Orçamentária")
+    st.title("🏛️ Radar de Emendas Parlamentares")
+    st.caption("CORE ESSENCE - Gestão Estratégica de Recursos Públicos")
     st.markdown("---")
 
-    # --- MENU LATERAL (FILTROS) ---
+    # --- SIDEBAR: FILTROS ---
     with st.sidebar:
-        st.header("🔍 Filtros de Busca")
+        st.header("📍 Filtros de Análise")
+        fonte_sel = st.selectbox("Base de Dados:", list(FONTES_DADOS.keys()))
+        ano_sel = st.selectbox("Ano de Referência", [2026, 2025, 2024], index=0)
         
-        # Filtro 1: Fonte de Dados
-        fonte_sel = st.selectbox("Selecione a Visão:", list(FONTES_DADOS.keys()))
-        
-        # Filtro 2: Ano
-        ano_sel = st.selectbox("Ano", [2026, 2025, 2024], index=0)
-        
-        # Filtro 3: Mês
         meses = ["Todos", "Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", 
                  "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"]
-        mes_sel = st.selectbox("Mês", meses)
+        mes_sel = st.selectbox("Mês de Referência", meses)
         
-        btn_atualizar = st.button("🚀 Aplicar Filtros")
+        btn_processar = st.button("🔍 Gerar Relatório")
 
-    if btn_atualizar:
+    if btn_processar:
         id_chave = FONTES_DADOS[fonte_sel]
-        df = carregar_dados_drive(id_chave)
+        df_base = carregar_dados_drive(id_chave)
         
-        if df is not None:
-            # --- APLICANDO FILTROS NO DATAFRAME ---
-            df_filt = df[df['ANO'] == ano_sel]
-            
-            if mes_sel != "Todos":
-                # Nota: Certifique-se que seu CSV tenha algo que identifique o mês
-                if 'MES' in df_filt.columns:
-                    df_filt = df_filt[df_filt['MES'] == mes_sel]
+        if df_base is not None:
+            # 1. Identificar colunas de valor e autor
+            col_v = next((c for c in ['VALOR_REPASSE_PROPOSTA_EMENDA', 'VALOR_EMENDA', 'VALOR_CONVENIO', 'VALOR_PAGO'] if c in df_base.columns), None)
+            col_a = next((c for c in ['NOME_PARLAMENTAR', 'AUTOR', 'NOME_FAVORECIDO', 'BENEFICIARIO'] if c in df_base.columns), None)
 
-            # --- ÁREA DE RESULTADOS (LADO DIREITO) ---
-            if not df_filt.empty:
-                st.subheader(f"📊 Resultados: {fonte_sel} ({mes_sel}/{ano_sel})")
-                
-                # Identificando colunas dinamicamente para o gráfico
-                col_valor = ""
-                for c in ['VALOR_REPASSE_PROPOSTA_EMENDA', 'VALOR_EMENDA', 'VALOR_CONVENIO']:
-                    if c in df_filt.columns:
-                        col_valor = c
-                        break
-                
-                col_autor = ""
-                for c in ['NOME_PARLAMENTAR', 'AUTOR', 'NOME_AUTOR']:
-                    if c in df_filt.columns:
-                        col_autor = c
-                        break
+            if col_v:
+                # Limpeza numérica
+                df_base[col_v] = df_base[col_v].astype(str).str.replace('.', '', regex=False).str.replace(',', '.', regex=False)
+                df_base[col_v] = pd.to_numeric(df_base[col_v], errors='coerce').fillna(0)
 
-                if col_valor and col_autor:
-                    # Limpeza de valor
-                    df_filt[col_valor] = df_filt[col_valor].astype(str).str.replace('.', '', regex=False).str.replace(',', '.', regex=False)
-                    df_filt[col_valor] = pd.to_numeric(df_filt[col_valor], errors='coerce').fillna(0)
-                    
-                    # Métricas
-                    total = df_filt[col_valor].sum()
-                    m1, m2 = st.columns(2)
-                    m1.metric("Volume Total", f"R$ {total:,.2f}".replace(",", "X").replace(".", ",").replace("X", "."))
-                    m2.metric("Qtd. de Registros", len(df_filt))
-                    
-                    # Gráfico
-                    st.bar_chart(df_filt.groupby(col_autor)[col_valor].sum().sort_values(ascending=False).head(10))
+                # --- LÓGICA DE FILTRAGEM ---
+                df_ano = df_base[df_base['ANO'] == ano_sel]
+                df_mes = df_ano[df_ano['MES'] == mes_sel] if mes_sel != "Todos" else df_ano
+
+                # --- CARDS SUPERIORES (KPIs) ---
+                st.subheader(f"📌 Resumo Financeiro - {fonte_sel}")
+                kpi1, kpi2, kpi3 = st.columns(3)
                 
-                st.write("### 📋 Dados Detalhados")
-                st.dataframe(df_filt, use_container_width=True)
-            else:
-                st.info(f"Nenhum dado encontrado para {mes_sel}/{ano_sel} nesta visão.")
+                soma_ano = df_ano[col_v].sum()
+                soma_mes = df_mes[col_v].sum()
+                
+                with kpi1:
+                    st.info(f"📅 Total Acumulado {ano_sel}")
+                    st.subheader(formatar_brl(soma_ano))
+                
+                with kpi2:
+                    st.success(f"🗓️ Total em {mes_sel}")
+                    st.subheader(formatar_brl(soma_mes))
+                
+                with kpi3:
+                    st.warning("📈 Registros")
+                    st.subheader(f"{len(df_mes)} itens")
+
+                st.markdown("---")
+
+                # --- GRÁFICOS E TABELAS ---
+                if not df_mes.empty:
+                    col_esq, col_dir = st.columns([1, 1])
+                    
+                    with col_esq:
+                        st.write(f"📊 **Top 10: {fonte_sel}**")
+                        if col_a:
+                            chart_data = df_mes.groupby(col_a)[col_v].sum().sort_values(ascending=False).head(10)
+                            st.bar_chart(chart_data)
+                    
+                    with col_dir:
+                        st.write("📋 **Últimas Movimentações**")
+                        # Exibe as colunas mais importantes na prévia
+                        cols_prio = [c for c in [col_a, col_v, 'FUNCAO', 'UF'] if c in df_mes.columns]
+                        st.dataframe(df_mes[cols_prio].head(15), use_container_width=True)
+
+                    st.write("### 🔍 Detalhamento Completo")
+                    st.dataframe(df_mes, use_container_width=True)
+                else:
+                    st.info(f"Sem movimentações registradas para {mes_sel}/{ano_sel}.")
 
 if __name__ == "__main__":
     executar()
