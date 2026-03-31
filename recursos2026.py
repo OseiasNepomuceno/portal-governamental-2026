@@ -13,7 +13,7 @@ st.set_page_config(page_title="Radar de Recursos | Core Essence", page_icon="�
 @st.cache_data(ttl=60) # Cache curto de 1 minuto para teste
 def buscar_dados_governo(codigo_ibge, mes_ano):
     # Forçamos a leitura da nova chave
-    chave = st.secrets.get("PORTAL_TRANSPARENCIA_KEY")
+    chave = st.secrets.get("chave-api-dados")
     
     if not chave:
         st.error("🚨 O Streamlit ainda não 'leu' a nova chave nos Secrets. Verifique se clicou em SAVE.")
