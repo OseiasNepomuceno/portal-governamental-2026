@@ -11,26 +11,36 @@ st.set_page_config(page_title="Radar de Recursos | Core Essence", page_icon="�
 
 # --- FUNÇÃO DE BUSCA NA API (PURA E DIRETA) ---
 @st.cache_data(ttl=3600)
+@st.cache_data(ttl=3600)
 def buscar_dados_governo(codigo_ibge, mes_ano):
-    url = "https://api.portaldatransparencia.gov.br/api-de-dados/transferencias/por-municipio"
-    # Puxa a chave que você vai salvar nos Secrets
-    headers = {"chave-api-dados": st.secrets["PORTAL_TRANSPARENCIA_KEY"]}
-    
-    all_results = []
-    pagina = 1
-    
-    while pagina <= 3: # Limitamos a 3 páginas para manter a velocidade
-        params = {"codigoIbge": codigo_ibge, "mesAno": mes_ano, "pagina": pagina}
-        try:
+    # Tenta pegar a chave. Se não achar, avisa o usuário de forma amigável
+    try:
+        chave = st.secrets.get("PORTAL_TRANSPARENCIA_KEY")
+        if not chave:
+            st.error("🚨 Chave da API não encontrada nos Secrets!")
+            return []
+            
+        url = "https://api.portaldatransparencia.gov.br/api-de-dados/transferencias/por-municipio"
+        headers = {"chave-api-dados": chave}
+        
+        all_results = []
+        pagina = 1
+        
+        while pagina <= 3:
+            params = {"codigoIbge": codigo_ibge, "mesAno": mes_ano, "pagina": pagina}
             res = requests.get(url, headers=headers, params=params, timeout=15)
             if res.status_code == 200:
                 dados = res.json()
                 if not dados: break
                 all_results.extend(dados)
                 pagina += 1
-            else: break
-        except: break
-    return all_results
+            else:
+                st.sidebar.warning(f"Erro API ({res.status_code})")
+                break
+        return all_results
+    except Exception as e:
+        st.error(f"Erro de Conexão: {e}")
+        return []
 
 # --- INTERFACE ---
 def executar():
