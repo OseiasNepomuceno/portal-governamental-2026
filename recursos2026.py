@@ -11,38 +11,47 @@ st.set_page_config(page_title="Radar de Recursos | Core Essence", page_icon="�
 
 # --- FUNÇÃO DE BUSCA NA API (PURA E DIRETA) ---
 @st.cache_data(ttl=3600)
-@st.cache_data(ttl=3600)
+
 def buscar_dados_governo(codigo_ibge, mes_ano):
-    # Tenta pegar a chave. Se não achar, avisa o usuário de forma amigável
-    try:
-        chave = st.secrets.get("PORTAL_TRANSPARENCIA_KEY")
-        if not chave:
-            st.error("🚨 Chave da API não encontrada nos Secrets!")
-            return []
-            
-        url = "https://api.portaldatransparencia.gov.br/api-de-dados/transferencias/por-municipio"
-        headers = {"chave-api-dados": chave}
-        
-        all_results = []
-        pagina = 1
-        
-        while pagina <= 3:
-            params = {"codigoIbge": codigo_ibge, "mesAno": mes_ano, "pagina": pagina}
-            res = requests.get(url, headers=headers, params=params, timeout=15)
-            if res.status_code == 200:
-                dados = res.json()
-                if not dados: break
-                all_results.extend(dados)
-                pagina += 1
-            else:
-                st.sidebar.warning(f"Erro API ({res.status_code})")
-                break
-        return all_results
-    except Exception as e:
-        st.error(f"Erro de Conexão: {e}")
+    # Buscando a chave dos Secrets de forma segura
+    chave = st.secrets.get("PORTAL_TRANSPARENCIA_KEY")
+    
+    if not chave:
+        st.error("🚨 Erro de Configuração: A chave 'PORTAL_TRANSPARENCIA_KEY' não foi detectada nos Secrets do Streamlit.")
         return []
 
-# --- INTERFACE ---
+    url = "https://api.portaldatransparencia.gov.br/api-de-dados/transferencias/por-municipio"
+    
+    # O Header exatamente como o governo solicitou
+    headers = {
+        "chave-api-dados": str(chave).strip(),
+        "Accept": "application/json"
+    }
+    
+    params = {
+        "codigoIbge": codigo_ibge, 
+        "mesAno": mes_ano, 
+        "pagina": 1
+    }
+    
+    try:
+        res = requests.get(url, headers=headers, params=params, timeout=20)
+        
+        if res.status_code == 200:
+            return res.json()
+        elif res.status_code == 401:
+            st.error("❌ Erro 401: Token Inválido. Verifique se a chave nos Secrets é a mesma do portal.")
+            return []
+        elif res.status_code == 403:
+            st.error("🚫 Erro 403: Acesso negado. Sua chave pode estar suspensa ou excedeu o limite.")
+            return []
+        else:
+            st.warning(f"Aviso: O portal retornou status {res.status_code}")
+            return []
+    except Exception as e:
+        st.error(f"Erro de conexão: {e}")
+        return []
+
 def executar():
     st.title("🛰️ Radar de Recursos Governamentais")
     st.caption("CORE ESSENCE - Inteligência em Dados Públicos (Via API Federal)")
@@ -52,35 +61,31 @@ def executar():
         plano = st.selectbox("Seu Plano:", ["Start", "Professional", "Enterprise"])
         st.divider()
         st.header("📍 Parâmetros de Busca")
-        # Padrão: Presidente Prudente (3541406)
+        # Presidente Prudente como padrão
         ibge = st.text_input("Código IBGE do Município", value="3541406")
-        ano = st.selectbox("Ano", [2026, 2025, 2024])
-        mes = st.selectbox("Mês", [f"{i:02d}" for i in range(1, 13)])
+        
+        # Sugestão: Testar com Janeiro/Fevereiro de 2026 para garantir que há dados
+        ano = st.selectbox("Ano", [2026, 2025, 2024], index=0)
+        mes = st.selectbox("Mês", [f"{i:02d}" for i in range(1, 13)], index=1) # index 1 = Fevereiro
         
         btn_radar = st.button("Rastrear Agora")
 
     if btn_radar:
         data_ref = f"{ano}{mes}"
-        with st.spinner(f"Acessando base federal de {data_ref}..."):
+        with st.spinner(f"Consultando base federal de {mes}/{ano}..."):
             resultados = buscar_dados_governo(ibge, data_ref)
             
             if resultados:
                 df = pd.DataFrame(resultados)
-                
-                # Métricas Rápidas
                 total = df['valor'].sum()
-                st.metric("Total Identificado no Mês", f"R$ {total:,.2f}")
-
-                # Gráfico e Tabela
-                st.subheader("📊 Distribuição de Verbas")
-                st.bar_chart(df.groupby('tipoTransferencia')['valor'].sum())
                 
+                st.success(f"✅ Sucesso! Conexão estabelecida com a API do Governo.")
+                
+                c1, c2 = st.columns(2)
+                c1.metric("Total Identificado", f"R$ {total:,.2f}".replace(",", "X").replace(".", ",").replace("X", "."))
+                c2.metric("Repasses", len(df))
+
                 st.subheader("📋 Relatório Detalhado")
                 st.dataframe(df[['tipoTransferencia', 'favorecido', 'valor', 'origemRecurso']], use_container_width=True)
-                
-                st.success("Busca realizada com sucesso! Dados 100% oficiais.")
             else:
-                st.warning("Nenhum repasse encontrado para este IBGE neste período.")
-
-if __name__ == "__main__":
-    executar()
+                st.info(f"Nenhum repasse encontrado para {mes}/{ano}. Tente o mês anterior (Fevereiro/2026 ou Janeiro/2026).")
