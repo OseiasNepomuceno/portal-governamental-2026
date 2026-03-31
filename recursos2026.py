@@ -10,43 +10,49 @@ import datetime
 st.set_page_config(page_title="Radar de Recursos | Core Essence", page_icon="🛰️", layout="wide")
 
 # --- FUNÇÃO DE BUSCA NA API (PURA E DIRETA) ---
-@st.cache_data(ttl=60) # Cache curto de 1 minuto para teste
-def buscar_dados_governo(codigo_ibge, mes_ano):
-    # Forçamos a leitura da nova chave
-    chave = st.secrets.get("chave-api-dados")
-    
+@st.cache_data(ttl=3600)
+def buscar_dados_governo(codigo_ibge, ano, mes):
+    chave = st.secrets.get("PORTAL_TRANSPARENCIA_KEY")
     if not chave:
-        st.error("🚨 O Streamlit ainda não 'leu' a nova chave nos Secrets. Verifique se clicou em SAVE.")
+        st.error("🚨 Chave não encontrada.")
         return []
 
-    # Limpeza total de caracteres invisíveis
     token = str(chave).strip()
+    
+    # AJUSTE DE FORMATO: O governo prefere MM/AAAA para transferências
+    data_formatada = f"{mes}/{ano}" 
     
     url = "https://api.portaldatransparencia.gov.br/api-de-dados/transferencias/por-municipio"
     
-   headers = {
+    headers = {
         "chave-api-dados": token,
-        "Accept": "*/*", # Mudamos para aceitar qualquer resposta
-        "User-Agent": "PostmanRuntime/7.26.8" # Simulando uma ferramenta de teste padrão
+        "Accept": "application/json",
+        "User-Agent": "Mozilla/5.0" 
     }
     
-    params = {"codigoIbge": codigo_ibge, "mesAno": mes_ano, "pagina": 1}
+    # Parâmetros com a data formatada corretamente
+    params = {
+        "codigoIbge": codigo_ibge,
+        "mesAno": data_formatada,
+        "pagina": 1
+    }
     
     try:
-        res = requests.get(url, headers=headers, params=params, timeout=20)
+        res = requests.get(url, headers=headers, params=params, timeout=25)
         
         if res.status_code == 200:
             return res.json()
         elif res.status_code == 403:
-            st.error(f"🚫 Erro 403: O Governo recebeu a chave mas negou o acesso.")
-            st.info("Isso pode ser porque a chave 'eece77...' ainda está sendo propagada nos servidores do governo. Tente novamente em 15 minutos.")
+            st.error(f"🚫 Erro 403: Tentativa com data {data_formatada} negada.")
+            st.info("Isso confirma que o Token está sendo enviado, mas o servidor recusa a requisição.")
             return []
         else:
-            st.error(f"Erro {res.status_code} - Verifique os parâmetros.")
+            st.error(f"Erro {res.status_code} na API.")
             return []
     except Exception as e:
         st.error(f"Erro de Conexão: {e}")
         return []
+
 def executar():
     st.title("🛰️ Radar de Recursos Governamentais")
     st.caption("CORE ESSENCE - Inteligência em Dados Públicos (Via API Federal)")
