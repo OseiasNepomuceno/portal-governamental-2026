@@ -11,45 +11,37 @@ st.set_page_config(page_title="Radar de Recursos | Core Essence", page_icon="�
 
 # --- FUNÇÃO DE BUSCA NA API (PURA E DIRETA) ---
 @st.cache_data(ttl=3600)
-
 def buscar_dados_governo(codigo_ibge, mes_ano):
-    # Buscando a chave dos Secrets de forma segura
     chave = st.secrets.get("PORTAL_TRANSPARENCIA_KEY")
     
     if not chave:
-        st.error("🚨 Erro de Configuração: A chave 'PORTAL_TRANSPARENCIA_KEY' não foi detectada nos Secrets do Streamlit.")
+        st.error("🚨 Chave não detectada nos Secrets.")
         return []
 
     url = "https://api.portaldatransparencia.gov.br/api-de-dados/transferencias/por-municipio"
     
-    # O Header exatamente como o governo solicitou
+    # Adicionamos o User-Agent para o governo não pensar que é um ataque hacker
     headers = {
         "chave-api-dados": str(chave).strip(),
-        "Accept": "application/json"
+        "Accept": "application/json",
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
     }
     
-    params = {
-        "codigoIbge": codigo_ibge, 
-        "mesAno": mes_ano, 
-        "pagina": 1
-    }
+    params = {"codigoIbge": codigo_ibge, "mesAno": mes_ano, "pagina": 1}
     
     try:
         res = requests.get(url, headers=headers, params=params, timeout=20)
         
         if res.status_code == 200:
             return res.json()
-        elif res.status_code == 401:
-            st.error("❌ Erro 401: Token Inválido. Verifique se a chave nos Secrets é a mesma do portal.")
-            return []
         elif res.status_code == 403:
-            st.error("🚫 Erro 403: Acesso negado. Sua chave pode estar suspensa ou excedeu o limite.")
+            st.error("🚫 Erro 403: O Governo bloqueou o acesso. Verifique se você confirmou o e-mail de ativação da chave no Portal da Transparência.")
             return []
         else:
-            st.warning(f"Aviso: O portal retornou status {res.status_code}")
+            st.error(f"Erro do Governo: {res.status_code}")
             return []
     except Exception as e:
-        st.error(f"Erro de conexão: {e}")
+        st.error(f"Erro de Conexão: {e}")
         return []
 
 def executar():
