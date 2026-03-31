@@ -9,24 +9,22 @@ import datetime
 # --- CONFIGURAÇÃO DA PÁGINA ---
 st.set_page_config(page_title="Radar de Recursos | Core Essence", page_icon="🛰️", layout="wide")
 
-# --- FUNÇÃO DE BUSCA NA API (PURA E DIRETA) ---
-@st.cache_data(ttl=60)
+# --- FUNÇÃO DE BUSCA NA API DO GOVERNO ---
+@st.cache_data(ttl=3600)
 def buscar_dados_governo(codigo_ibge, ano, mes):
-    # Tenta ler a chave de 3 formas diferentes (Segurança máxima)
-    chave = st.secrets.get("chave-api-dados") or \
-            st.secrets.get("chave-api-dados") or \
-            st.secrets.get("default", {}).get("chave-api-dados")
-
+    # BUSCA EXATA: Sincronizado com o nome que você salvou no Secrets
+    chave = st.secrets.get("chave-api-dados")
+    
     if not chave:
-        # Se mesmo assim não achar, vamos listar o que o Streamlit ESTÁ vendo
-        chaves_vistas = list(st.secrets.to_dict().keys())
-        st.error(f"🚨 O Streamlit não encontrou a chave. Ele só consegue ver estas chaves: {chaves_vistas}")
+        st.error("🚨 Erro: A chave 'chave-api-dados' não foi encontrada nos Secrets do Streamlit.")
         return []
 
+    # Limpeza de segurança (remove aspas ou espaços acidentais)
     token = str(chave).strip().replace('"', '').replace("'", "")
     
-    # Formato MM/AAAA conforme a regra da CGU
+    # Formato MM/AAAA (Padrão exigido pelo Portal da Transparência)
     data_formatada = f"{mes}/{ano}"
+    
     url = "https://api.portaldatransparencia.gov.br/api-de-dados/transferencias/por-municipio"
     
     headers = {
@@ -35,56 +33,77 @@ def buscar_dados_governo(codigo_ibge, ano, mes):
         "User-Agent": "CoreEssence-Radar/1.0"
     }
     
-    params = {"codigoIbge": codigo_ibge, "mesAno": data_formatada, "pagina": 1}
+    params = {
+        "codigoIbge": codigo_ibge,
+        "mesAno": data_formatada,
+        "pagina": 1
+    }
     
     try:
-        res = requests.get(url, headers=headers, params=params, timeout=25)
+        res = requests.get(url, headers=headers, params=params, timeout=30)
+        
         if res.status_code == 200:
             return res.json()
         elif res.status_code == 403:
-            st.error("🚫 Erro 403: Acesso Negado pelo Governo. Verifique a autorização no portal.")
+            st.error(f"🚫 Erro 403: Acesso negado pelo Governo para a data {data_formatada}.")
+            st.info("Sua chave foi reconhecida, mas o servidor do governo ainda está processando a autorização. Tente novamente em alguns minutos.")
             return []
         else:
-            st.error(f"Erro {res.status_code} na API do Governo.")
+            st.error(f"Erro {res.status_code} na API Federal. Verifique os parâmetros.")
             return []
     except Exception as e:
-        st.error(f"Erro de Conexão: {e}")
+        st.error(f"Falha técnica de conexão: {e}")
         return []
 
+# --- INTERFACE PRINCIPAL ---
 def executar():
     st.title("🛰️ Radar de Recursos Governamentais")
-    st.caption("CORE ESSENCE - Inteligência em Dados Públicos (Via API Federal)")
+    st.caption("CORE ESSENCE - Inteligência em Dados Públicos em Tempo Real")
 
     with st.sidebar:
         st.header("🔑 Painel do Consultor")
-        plano = st.selectbox("Seu Plano:", ["Start", "Professional", "Enterprise"])
+        st.selectbox("Seu Plano:", ["Start", "Professional", "Enterprise"])
+        
         st.divider()
         st.header("📍 Parâmetros de Busca")
-        # Presidente Prudente como padrão
+        # Padrão: Presidente Prudente (3541406)
         ibge = st.text_input("Código IBGE do Município", value="3541406")
-        
-        # Sugestão: Testar com Janeiro/Fevereiro de 2026 para garantir que há dados
         ano = st.selectbox("Ano", [2026, 2025, 2024], index=0)
-        mes = st.selectbox("Mês", [f"{i:02d}" for i in range(1, 13)], index=1) # index 1 = Fevereiro
+        # Sugestão: Iniciar em Janeiro (01) para garantir dados consolidados
+        mes = st.selectbox("Mês", [f"{i:02d}" for i in range(1, 13)], index=0)
         
         btn_radar = st.button("Rastrear Agora")
 
     if btn_radar:
-        data_ref = f"{ano}{mes}"
         with st.spinner(f"Consultando base federal de {mes}/{ano}..."):
-            resultados = buscar_dados_governo(ibge, data_ref)
+            resultados = buscar_dados_governo(ibge, ano, mes)
             
             if resultados:
                 df = pd.DataFrame(resultados)
-                total = df['valor'].sum()
                 
-                st.success(f"✅ Sucesso! Conexão estabelecida com a API do Governo.")
+                # Garante que a coluna 'valor' seja numérica
+                if 'valor' in df.columns:
+                    df['valor'] = pd.to_numeric(df['valor'], errors='coerce').fillna(0)
                 
-                c1, c2 = st.columns(2)
-                c1.metric("Total Identificado", f"R$ {total:,.2f}".replace(",", "X").replace(".", ",").replace("X", "."))
-                c2.metric("Repasses", len(df))
+                total = df['valor'].sum() if 'valor' in df.columns else 0
+                
+                st.success("✅ Dados obtidos com sucesso!")
+                
+                col1, col2 = st.columns(2)
+                # Formatação de moeda brasileira (R$)
+                valor_formatado = f"R$ {total:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+                col1.metric("Total Identificado", valor_formatado)
+                col2.metric("Nº de Repasses", len(df))
 
-                st.subheader("📋 Relatório Detalhado")
-                st.dataframe(df[['tipoTransferencia', 'favorecido', 'valor', 'origemRecurso']], use_container_width=True)
+                st.subheader("📋 Detalhamento das Transferências")
+                # Filtrando apenas as colunas mais importantes para o consultor
+                colunas_vistas = ['tipoTransferencia', 'favorecido', 'valor', 'origemRecurso']
+                # Verifica quais colunas realmente existem no retorno da API
+                colunas_finais = [c for c in colunas_vistas if c in df.columns]
+                
+                st.dataframe(df[colunas_finais], use_container_width=True)
             else:
-                st.info(f"Nenhum repasse encontrado para {mes}/{ano}. Tente o mês anterior (Fevereiro/2026 ou Janeiro/2026).")
+                st.info(f"Nenhum dado encontrado para {mes}/{ano}. Tente um mês anterior (ex: 12/2025).")
+
+if __name__ == "__main__":
+    executar()
