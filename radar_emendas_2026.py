@@ -32,42 +32,39 @@ def buscar_emendas_governo(ano, pagina=1):
 
 def executar():
     st.title("🏛️ Radar de Emendas Parlamentares")
-    st.caption("CORE ESSENCE - Monitoramento de Verbas Legislativas em Tempo Real")
+    st.caption("CORE ESSENCE - Inteligência em Gestão Pública e Emendas")
     st.markdown("---")
 
     with st.sidebar:
         st.header("📍 Filtros de Emendas")
         ano_sel = st.selectbox("Ano da Emenda", [2026, 2025, 2024, 2023], index=2)
-        btn_buscar = st.button("🔍 Consultar Emendas")
+        btn_buscar = st.button("🔍 Consultar Volume de Dados")
 
-   if btn_buscar:
-        with st.spinner(f"Rastreando volume massivo de emendas de {ano_sel}..."):
+    if btn_buscar:
+        with st.spinner(f"🚀 Core Essence rastreando múltiplas páginas de {ano_sel}..."):
+            # --- BUSCA MULTI-PÁGINAS (TURBO) ---
             todas_emendas = []
-            # Vamos buscar as 3 primeiras páginas para ter mais dados no gráfico
-            for p in range(1, 4): 
+            for p in range(1, 4): # Busca as páginas 1, 2 e 3
                 dados_pg = buscar_emendas_governo(ano_sel, pagina=p)
                 if dados_pg:
                     todas_emendas.extend(dados_pg)
             
             if todas_emendas:
                 df = pd.DataFrame(todas_emendas)
-                # ... restante do seu código de tratamento ...
                 
-                # --- TRATAMENTO DE VALORES (CORRIGIDO PARA SAIR DO R$ 0,00) ---
+                # --- TRATAMENTO DE VALORES ---
                 colunas_valor = ['valorEmpenhado', 'valorLiquidado', 'valorPago']
                 for col in colunas_valor:
                     if col in df.columns:
-                        # Limpeza profunda: remove pontos e troca vírgula por ponto
                         df[col] = df[col].astype(str).str.replace('.', '', regex=False)
                         df[col] = df[col].str.replace(',', '.', regex=False)
                         df[col] = pd.to_numeric(df[col], errors='coerce').fillna(0)
 
-                # --- MÉTRICAS ---
+                # --- MÉTRICAS CONSOLIDADAS ---
                 total_empenhado = df['valorEmpenhado'].sum()
                 total_pago = df['valorPago'].sum()
                 
                 m1, m2 = st.columns(2)
-                # Formatação Brasileira
                 v_emp = f"R$ {total_empenhado:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
                 v_pag = f"R$ {total_pago:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
                 
@@ -75,19 +72,18 @@ def executar():
                 m2.metric("Total na Conta (Pago)", v_pag)
 
                 # --- GRÁFICO ---
-                st.subheader("📊 Volume por Autor (Top 10)")
+                st.subheader("📊 Distribuição de Recursos (Top 10 Autores)")
                 if 'nomeAutor' in df.columns:
-                    # Agrupa pelo nome do autor e soma os valores reais
                     chart_data = df.groupby('nomeAutor')['valorEmpenhado'].sum().sort_values(ascending=False).head(10)
                     st.bar_chart(chart_data)
 
                 # --- TABELA ---
-                st.subheader("📋 Detalhamento")
+                st.subheader(f"📋 Listagem Consolidada ({len(df)} registros)")
                 cols_exibir = ['numeroEmenda', 'nomeAutor', 'tipoEmenda', 'funcao', 'valorEmpenhado', 'valorPago']
                 cols_finais = [c for c in cols_exibir if c in df.columns]
                 st.dataframe(df[cols_finais], use_container_width=True)
             else:
-                st.info("Nenhum dado retornado para este ano.")
+                st.info(f"🛰️ Radar em vigília: Sem dados públicos para {ano_sel} no momento.")
 
 if __name__ == "__main__":
     executar()
