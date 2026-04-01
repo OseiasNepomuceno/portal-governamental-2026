@@ -82,7 +82,6 @@ def tela_cadastro():
 
     st.markdown("---")
     
-    # 1. Seleção de Plano FORA do formulário para permitir atualização em tempo real
     planos = [
         "BRONZE - R$ 300,00/mês",
         "PRATA - R$ 800,00/mês",
@@ -91,23 +90,21 @@ def tela_cadastro():
     ]
     escolha = st.selectbox("Selecione seu Plano de Atuação:", planos)
 
-    # 2. Mensagem Dinâmica que muda IMEDIATAMENTE
     if "BRONZE" in escolha:
-        st.info("🎯 **PLANO BRONZE:** Você terá acesso a **03 cidades** específicas dentro de 01 estado + **05 Revisões** de Estatuto Inteligente.")
+        st.info("🎯 **PLANO BRONZE:** Acesso a 03 cidades + 05 Revisões.")
     elif "PRATA" in escolha:
-        st.info("🥈 **PLANO PRATA:** Você terá acesso a **01 Estado completo** (todas as cidades) + **15 Revisões** de Estatuto Inteligente.")
+        st.info("🥈 **PLANO PRATA:** Acesso a 01 Estado completo + 15 Revisões.")
     elif "OURO" in escolha:
-        st.info("🥇 **PLANO OURO:** Você terá acesso a **03 Estados completos** (todas as cidades) + **50 Revisões** de Estatuto Inteligente.")
+        st.info("🥇 **PLANO OURO:** Acesso a 03 Estados completos + 50 Revisões.")
     elif "DIAMANTE" in escolha:
-        st.success("💎 **PLANO DIAMANTE:** Acesso **NACIONAL TOTAL** (Todos os Estados + DF) + **200 Revisões** de Estatuto Inteligente.")
+        st.success("💎 **PLANO DIAMANTE:** Acesso NACIONAL TOTAL + 200 Revisões.")
 
-    # 3. Formulário para os dados e campos específicos
+    # TUDO DAQUI PARA BAIXO PRECISA ESTAR COM 1 TAB (OU 4 ESPAÇOS) DE RECUO DENTRO DO WITH
     with st.form("detalhes_cadastro"):
         nome = st.text_input("Nome Completo")
         whatsapp = st.text_input("WhatsApp (com DDD)")
         email = st.text_input("E-mail Profissional")
 
-        # Campos de texto que também mudam conforme a escolha acima
         if "BRONZE" in escolha:
             st.text_input("Qual o Estado (UF)?")
             st.text_area("Liste as 03 cidades desejadas:")
@@ -118,39 +115,34 @@ def tela_cadastro():
         elif "DIAMANTE" in escolha:
             st.write("✅ Seu acesso será configurado como Master Nacional.")
 
-       if st.form_submit_button("GERAR MEU ACESSO"):
+        # O botão precisa estar EXATAMENTE na mesma linha vertical do 'nome = ...'
+        submit = st.form_submit_button("GERAR MEU ACESSO")
+
+        if submit:
             if nome and whatsapp and email:
-                # Prepara a lista de dados para enviar à planilha
-                # Ordem: usuario, senha, status, PLANO, nome_completo, whatsapp, email
-                # DICA: Definimos a senha inicial como os 4 últimos dígitos do WhatsApp
+                # Prepara os dados para a planilha
                 senha_inicial = str(whatsapp)[-4:]
-                
                 novos_dados = [
-                    email,           # usuario (será o email)
-                    senha_inicial,   # senha
-                    "pendente",      # status (fica pendente até você confirmar o PIX)
-                    escolha.split('-')[0].strip(), # PLANO (Bronze, Prata, etc)
-                    nome,            # Nome Completo
-                    whatsapp,        # Contato
-                    email            # Email de registro
+                    email, 
+                    senha_inicial, 
+                    "pendente", 
+                    escolha.split('-')[0].strip(),
+                    nome, 
+                    whatsapp, 
+                    email
                 ]
                 
-                with st.spinner("Processando seu cadastro..."):
+                with st.spinner("Salvando seus dados..."):
                     sucesso = salvar_cadastro_google_sheets(novos_dados)
                 
                 if sucesso:
                     st.balloons()
-                    st.success(f"🚀 Excelente, {nome}! Seus dados foram salvos.")
-                    st.markdown(f"""
-                    ### 💳 Próximo Passo: Pagamento
-                    Para liberar seu login agora, realize o PIX do valor: **{escolha.split('-')[1]}**
-                    
-                    **Chave PIX:** `SUA_CHAVE_AQUI`
-                    
-                    *Seu login será seu e-mail e sua senha temporária são os 4 últimos dígitos do seu WhatsApp.*
-                    """)
+                    st.success(f"🚀 Excelente, {nome}! Cadastro salvo com sucesso.")
+                    st.markdown(f"### Pagamento do Plano: {escolha.split('-')[0]}")
+                    st.code("SUA-CHAVE-PIX-AQUI", language="text")
+                    st.info("Após o pagamento, seu acesso será liberado pelo suporte.")
             else:
-                st.warning("Por favor, preencha todos os campos obrigatórios.")
+                st.warning("Por favor, preencha todos os campos.")
 # --- 4. LÓGICA DE NAVEGAÇÃO PRINCIPAL ---
 def executar():
     # Inicializa variáveis de controle
