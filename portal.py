@@ -37,12 +37,14 @@ def executar():
     # --- LÓGICA DE NAVEGAÇÃO ---
    # --- LÓGICA DE NAVEGAÇÃO ---
     if escolha == "📊 Recursos":
-        # Chamando o seu arquivo Recursos2026.py (ou o nome que você deu ao arquivo do Radar)
         try:
-            import radar_emendas_2026 as radar 
-            radar.exibir_radar()
+            # Importa o arquivo específico recursos2026.py
+            import recursos2026 as rec
+            # Chama a função que criamos lá dentro
+            rec.exibir_radar() 
         except Exception as e:
-            st.error(f"Erro ao carregar o módulo de Recursos: {e}")
+            st.error(f"Erro ao carregar o arquivo recursos2026.py: {e}")
+            st.info("Verifique se o nome do arquivo no GitHub está exatamente como 'recursos2026.py'")
 
     elif escolha == "🏛️ Radar de Emendas":
         try:
@@ -52,6 +54,7 @@ def executar():
             st.error(f"Erro ao carregar módulo: {e}")
 
     elif escolha == "📜 Revisão de Estatuto":
+        # ... resto do seu código ...
         st.title("📜 Revisão de Estatuto")
         st.write("Área de análise de documentos.")
 
