@@ -39,15 +39,13 @@ def executar():
         st.info("Este módulo está sendo integrado com a base de dados do Tesouro Nacional.")
         # Aqui você chamaria a função do módulo de recursos
         
-    elif escolha == "🏛️ Radar de Emendas":
-        # IMPORTANTE: Aqui chamamos a função que criamos no arquivo de emendas
+   elif escolha == "🏛️ Radar de Emendas":
         try:
             import radar_emendas_2026 as radar
-            radar.executar()
-        except ImportError:
-            st.error("Módulo 'radar_emendas_2026.py' não encontrado no diretório.")
+            # ALTERE A LINHA ABAIXO:
+            radar.exibir_radar() 
         except Exception as e:
-            st.error(f"Erro ao carregar o Radar: {e}")
+            st.error(f"Erro ao carregar módulo: {e}")
             
     elif escolha == "📜 Revisão de Estatuto":
         st.title("📜 Revisor de Estatutos (IA)")
