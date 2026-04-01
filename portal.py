@@ -18,34 +18,39 @@ def autenticar_usuario(usuario_digitado, senha_digitada):
     url = f'https://drive.google.com/uc?id={file_id}'
     
     try:
-        if not os.path.exists(nome_arquivo):
-            gdown.download(url, nome_arquivo, quiet=True)
+        # 1. Tenta baixar e ler a planilha
+        if os.path.exists(nome_arquivo):
+            os.remove(nome_arquivo)
+        gdown.download(url, nome_arquivo, quiet=True)
         
         df = pd.read_excel(nome_arquivo, sheet_name='usuario')
         
-        # Busca o usuário na planilha
-        user_row = df[(df['usuario'].astype(str) == str(usuario_digitado)) & 
-                      (df['senha'].astype(str) == str(senha_digitada))]
+        # 2. Busca o usuário e senha (ignorando espaços)
+        user_row = df[(df['usuario'].astype(str).str.strip() == str(usuario_digitado).strip()) & 
+                      (df['senha'].astype(str).str.strip() == str(senha_digitada).strip())]
         
-    if not user_row.empty:
-            # Pegamos a primeira linha encontrada
+        if not user_row.empty:
             dados = user_row.iloc[0]
             
-            # Buscamos as colunas independente de estarem MAIÚSCULAS ou minúsculas
-            # O .get() tenta pegar 'plano', se não achar tenta 'PLANO'
-            plano_bruto = dados.get('plano', dados.get('PLANO', 'BRONZE'))
-            status_bruto = dados.get('status', dados.get('STATUS', 'ativo'))
+            # 3. Captura PLANO ou plano (Segurança para maiúsculas)
+            plano_bruto = dados.get('PLANO', dados.get('plano', 'BRONZE'))
+            status_bruto = dados.get('STATUS', dados.get('status', 'ativo'))
 
             if str(status_bruto).lower().strip() == 'ativo':
                 st.session_state['logado'] = True
-                st.session_state['usuario_nome'] = dados.get('usuario', dados.get('USUARIO', 'Consultor'))
+                st.session_state['usuario_nome'] = dados.get('usuario', 'Consultor')
                 st.session_state['usuario_plano'] = str(plano_bruto).upper().strip()
                 st.session_state['usuario_status'] = 'ativo'
                 return True
             else:
-                st.error("⚠️ Esta conta está EXPIRADA no sistema.")
+                st.error("⚠️ Esta conta está EXPIRADA.")
+        else:
+            st.error("❌ Usuário ou senha incorretos.")
+            
     except Exception as e:
+        # ESTE É O BLOCO QUE ESTAVA FALTANDO E CAUSOU O ERRO
         st.error(f"Erro ao conectar com base de dados: {e}")
+        
     return False
 
 # --- 3. INTERFACE DE LOGIN ---
