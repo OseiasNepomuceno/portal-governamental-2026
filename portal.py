@@ -117,15 +117,39 @@ def tela_cadastro():
         elif "DIAMANTE" in escolha:
             st.write("✅ Seu acesso será configurado como Master Nacional.")
 
-        if st.form_submit_button("GERAR MEU ACESSO"):
+       if st.form_submit_button("GERAR MEU ACESSO"):
             if nome and whatsapp and email:
-                st.success(f"🚀 Excelente, {nome}! Cadastro pré-aprovado.")
-                st.markdown(f"### Pagamento do Plano: {escolha.split('-')[0]}")
-                st.code("SUA-CHAVE-PIX-AQUI", language="text")
-                st.info("Após o PIX, envie o comprovante. Seu acesso será liberado em instantes!")
+                # Prepara a lista de dados para enviar à planilha
+                # Ordem: usuario, senha, status, PLANO, nome_completo, whatsapp, email
+                # DICA: Definimos a senha inicial como os 4 últimos dígitos do WhatsApp
+                senha_inicial = str(whatsapp)[-4:]
+                
+                novos_dados = [
+                    email,           # usuario (será o email)
+                    senha_inicial,   # senha
+                    "pendente",      # status (fica pendente até você confirmar o PIX)
+                    escolha.split('-')[0].strip(), # PLANO (Bronze, Prata, etc)
+                    nome,            # Nome Completo
+                    whatsapp,        # Contato
+                    email            # Email de registro
+                ]
+                
+                with st.spinner("Processando seu cadastro..."):
+                    sucesso = salvar_cadastro_google_sheets(novos_dados)
+                
+                if sucesso:
+                    st.balloons()
+                    st.success(f"🚀 Excelente, {nome}! Seus dados foram salvos.")
+                    st.markdown(f"""
+                    ### 💳 Próximo Passo: Pagamento
+                    Para liberar seu login agora, realize o PIX do valor: **{escolha.split('-')[1]}**
+                    
+                    **Chave PIX:** `SUA_CHAVE_AQUI`
+                    
+                    *Seu login será seu e-mail e sua senha temporária são os 4 últimos dígitos do seu WhatsApp.*
+                    """)
             else:
-                st.warning("Por favor, preencha todos os campos.")
-
+                st.warning("Por favor, preencha todos os campos obrigatórios.")
 # --- 4. LÓGICA DE NAVEGAÇÃO PRINCIPAL ---
 def executar():
     # Inicializa variáveis de controle
