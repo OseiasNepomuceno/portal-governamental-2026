@@ -54,37 +54,52 @@ def tela_cadastro():
         st.session_state['tela'] = 'home'
         st.rerun()
 
-    with st.form("form_premium"):
+    st.markdown("---")
+    
+    # 1. Seleção de Plano FORA do formulário para permitir atualização em tempo real
+    planos = [
+        "BRONZE - R$ 300,00/mês",
+        "PRATA - R$ 800,00/mês",
+        "OURO - R$ 2.000,00/mês",
+        "DIAMANTE - R$ 5.000,00/mês"
+    ]
+    escolha = st.selectbox("Selecione seu Plano de Atuação:", planos)
+
+    # 2. Mensagem Dinâmica que muda IMEDIATAMENTE
+    if "BRONZE" in escolha:
+        st.info("🎯 **PLANO BRONZE:** Você terá acesso a **03 cidades** específicas dentro de 01 estado + **05 Revisões** de Estatuto Inteligente.")
+    elif "PRATA" in escolha:
+        st.info("🥈 **PLANO PRATA:** Você terá acesso a **01 Estado completo** (todas as cidades) + **15 Revisões** de Estatuto Inteligente.")
+    elif "OURO" in escolha:
+        st.info("🥇 **PLANO OURO:** Você terá acesso a **03 Estados completos** (todas as cidades) + **50 Revisões** de Estatuto Inteligente.")
+    elif "DIAMANTE" in escolha:
+        st.success("💎 **PLANO DIAMANTE:** Acesso **NACIONAL TOTAL** (Todos os Estados + DF) + **200 Revisões** de Estatuto Inteligente.")
+
+    # 3. Formulário para os dados e campos específicos
+    with st.form("detalhes_cadastro"):
         nome = st.text_input("Nome Completo")
         whatsapp = st.text_input("WhatsApp (com DDD)")
-        email = st.text_input("E-mail")
-        
-        planos = [
-            "BRONZE - R$ 300,00/mês",
-            "PRATA - R$ 800,00/mês",
-            "OURO - R$ 2.000,00/mês",
-            "DIAMANTE - R$ 5.000,00/mês"
-        ]
-        escolha = st.selectbox("Selecione seu Plano:", planos)
+        email = st.text_input("E-mail Profissional")
 
-        # Campos dinâmicos
+        # Campos de texto que também mudam conforme a escolha acima
         if "BRONZE" in escolha:
-            st.info("🎯 Bronze: 03 cidades + 05 Revisões")
-            st.text_input("Estado (UF):")
-            st.text_area("Quais as 03 cidades?")
+            st.text_input("Qual o Estado (UF)?")
+            st.text_area("Liste as 03 cidades desejadas:")
         elif "PRATA" in escolha:
-            st.info("🥈 Prata: 01 Estado completo + 15 Revisões")
-            st.text_input("Qual Estado (UF)?")
+            st.text_input("Qual o Estado (UF) deseja liberar?")
         elif "OURO" in escolha:
-            st.info("🥇 Ouro: 03 Estados completos + 50 Revisões")
-            st.text_area("Quais os 03 Estados (UF)?")
+            st.text_area("Quais os 03 Estados (UF) deseja liberar?")
         elif "DIAMANTE" in escolha:
-            st.success("💎 Diamante: Nacional Total + 200 Revisões")
+            st.write("✅ Seu acesso será configurado como Master Nacional.")
 
-        if st.form_submit_button("GERAR ACESSO E PAGAMENTO"):
-            st.success("✅ Cadastro pré-aprovado! Realize o PIX para liberar.")
-            st.code("CHAVE-PIX-AQUI", language="text")
-            st.info("Envie o comprovante para o suporte.")
+        if st.form_submit_button("GERAR MEU ACESSO"):
+            if nome and whatsapp and email:
+                st.success(f"🚀 Excelente, {nome}! Cadastro pré-aprovado.")
+                st.markdown(f"### Pagamento do Plano: {escolha.split('-')[0]}")
+                st.code("SUA-CHAVE-PIX-AQUI", language="text")
+                st.info("Após o PIX, envie o comprovante. Seu acesso será liberado em instantes!")
+            else:
+                st.warning("Por favor, preencha todos os campos.")
 
 # --- 4. LÓGICA DE NAVEGAÇÃO PRINCIPAL ---
 def executar():
