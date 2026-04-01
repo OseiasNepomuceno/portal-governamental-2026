@@ -15,7 +15,7 @@ def salvar_cadastro_google_sheets(dados_cliente):
     
     try:
         # USA O NOME EXATO DO SEU ARQUIVO .JSON
-        nome_da_chave = 'streamlit-ponto@ponto-facial-oseiascarveng.iam.gserviceaccount.com'
+        nome_da_chave = 'ponto-facial-oseiascarveng-cd7b1ab54295.json'
         
         creds = Credentials.from_service_account_file(nome_da_chave, scopes=scope)
         client = gspread.authorize(creds)
