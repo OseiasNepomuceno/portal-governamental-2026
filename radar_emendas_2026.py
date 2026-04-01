@@ -88,39 +88,30 @@ def exibir_radar():
             # 1. Tratamento de Valor Usando a Função Blindada
             df_base[col_v_emp] = df_base[col_v_emp].apply(limpar_valor_monetario)
 
-            # 2. Separação de Ano/Mês
-          # 2. Separação de Ano/Mês (Lógica Reforçada)
+           # 2. Separação de Ano/Mês (Lógica de Posição Fixa)
             if col_tempo:
-                # Limpa a coluna original
+                # Limpa a sujeira da coluna original
                 df_base[col_tempo] = df_base[col_tempo].astype(str).str.strip()
                 
-                # Tenta extrair o Ano (os primeiros 4 caracteres: '2026')
+                # ANO: Pega sempre os 4 primeiros dígitos (Ex: 2026)
                 df_base['ANO_REF'] = df_base[col_tempo].str[:4]
                 
-                # Tenta extrair o Mês (os últimos 2 caracteres após a barra: '01')
-                if '/' in df_base[col_tempo].iloc[0]:
-                    df_base['MES_REF'] = df_base[col_tempo].str.split('/').str[-1].str.strip()
-                else:
-                    df_base['MES_REF'] = "Todos"
+                # MÊS: Pega sempre os 2 últimos dígitos (Ex: 01)
+                # Isso funciona para '2026/01', '2026-01' ou '01'
+                df_base['MES_REF'] = df_base[col_tempo].str[-2:].str.strip()
 
-            # 3. Filtragem (Comparação de Texto com Texto)
+            # 3. Filtragem (Conversão para String Garantida)
             df_final = df_base
             
-            # Filtro de Ano: Comparamos '2026' (planilha) com '2026' (menu)
+            # Filtro de Ano
             if 'ANO_REF' in df_base.columns:
                 df_final = df_base[df_base['ANO_REF'] == str(ano_sel)]
             
-            # Filtro de Mês
+            # Filtro de Mês (Só aplica se não for "Todos")
             if mes_sel != "Todos" and 'MES_REF' in df_base.columns:
-                df_final = df_final[df_final['MES_REF'] == str(mes_sel)]
-
-            # 3. Filtragem
-            df_final = df_base
-            if 'ANO_REF' in df_base.columns:
-                df_final = df_base[df_base['ANO_REF'] == str(ano_sel).strip()]
-            
-            if mes_sel != "Todos" and 'MES_REF' in df_base.columns:
-                df_final = df_final[df_final['MES_REF'] == str(mes_sel).strip()]
+                # Forçamos o filtro a ser sempre com 2 dígitos (ex: '01')
+                filtro_mes = str(mes_sel).zfill(2)
+                df_final = df_final[df_final['MES_REF'] == filtro_mes]
 
             # --- CARDS DE INDICADORES ---
             v_total = df_final[col_v_emp].sum()
