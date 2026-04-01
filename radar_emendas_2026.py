@@ -67,22 +67,39 @@ def exibir_radar():
         col_dest  = achar(df_base, ["FAVORECIDO"]) or achar(df_base, ["MUNICÍPIO"])
         col_tempo = achar(df_base, ["ANO", "MÊS"]) or achar(df_base, ["ANO"])
 
-        if col_v_emp:
-            # Tratamento de Valores
+      if col_v_emp:
+            # 1. Tratamento Numérico
             df_base[col_v_emp] = df_base[col_v_emp].astype(str).str.replace('.', '', regex=False).str.replace(',', '.', regex=False)
             df_base[col_v_emp] = pd.to_numeric(df_base[col_v_emp], errors='coerce').fillna(0)
 
-            # Filtragem
-            df_final = df_base
+            # 2. SEPARAÇÃO DE ANO E MÊS (A Mágica acontece aqui ✨)
             if col_tempo:
-                df_final = df_base[df_base[col_tempo].astype(str).str.contains(str(ano_sel))]
-                if mes_sel != "Todos":
-                    df_final = df_final[df_final[col_tempo].astype(str).str.contains(f"/{mes_sel}")]
+                # Transforma '2026/01' em duas colunas reais
+                datas_separadas = df_base[col_tempo].astype(str).str.split('/', expand=True)
+                if datas_separadas.shape[1] == 2:
+                    df_base['ANO_REF'] = datas_separadas[0]
+                    df_base['MES_REF'] = datas_separadas[1]
+                else:
+                    # Caso a coluna só tenha o ano
+                    df_base['ANO_REF'] = df_base[col_tempo].astype(str)
+                    df_base['MES_REF'] = "Todos"
 
-            # KPIs
+            # 3. FILTRAGEM REFEITA (Agora usando as colunas limpas)
+            df_final = df_base
+            
+            # Filtra o Ano
+            if 'ANO_REF' in df_base.columns:
+                df_final = df_base[df_base['ANO_REF'] == str(ano_sel)]
+            
+            # Filtra o Mês (Se não for "Todos")
+            if mes_sel != "Todos" and 'MES_REF' in df_base.columns:
+                df_final = df_final[df_final['MES_REF'] == str(mes_sel)]
+
+            # --- CARDS DE INDICADORES (KPIs) ---
             v_total = df_final[col_v_emp].sum()
             k1, k2, k3 = st.columns(3)
             label = "no Ano" if mes_sel == "Todos" else f"em {mes_sel}/{ano_sel}"
+            
             k1.metric(f"Total Identificado {label}", formatar_brl(v_total))
             k2.metric("Qtd. Registros", f"{len(df_final)}")
             
