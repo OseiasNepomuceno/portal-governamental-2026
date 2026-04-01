@@ -22,7 +22,7 @@ def salvar_cadastro_google_sheets(dados_cliente):
         
         # Abre a planilha ID_LICENÇAS
         # Se a aba de usuários não for a primeira, mude .sheet1 para .worksheet("usuario")
-        planilha = client.open("ID_LICENÇAS").sheet1
+        planilha = client.open("ID_LICENÇAS").worksheet("usuario")
         
         # Adiciona a linha com os dados do novo consultor
         planilha.append_row(dados_cliente)
