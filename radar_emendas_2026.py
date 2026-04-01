@@ -81,7 +81,7 @@ def exibir_radar():
         col_dest  = achar(df_base, ["FAVORECIDO"]) or achar(df_base, ["MUNICÍPIO"])
         col_tempo = achar(df_base, ["ANO", "MÊS"]) or achar(df_base, ["ANO"])
 
-        if col_v_emp:
+      if col_v_emp:
             # Tratamento Numérico
             df_base[col_v_emp] = df_base[col_v_emp].astype(str).str.replace('.', '', regex=False).str.replace(',', '.', regex=False)
             df_base[col_v_emp] = pd.to_numeric(df_base[col_v_emp], errors='coerce').fillna(0)
@@ -90,4 +90,42 @@ def exibir_radar():
             df_final = df_base
             if col_tempo:
                 # Filtra pelo ano contido na string (ex: "2026" em "2026/01")
-                df_final = df_base[df_base[col_tempo].
+                df_final = df_base[df_base[col_tempo].astype(str).str.contains(str(ano_sel))]
+                
+                # Filtra pelo mês se selecionado (ex: "/01" em "2026/01")
+                if mes_sel != "Todos":
+                    df_final = df_final[df_final[col_tempo].astype(str).str.contains(f"/{mes_sel}")]
+
+            # --- CARDS DE INDICADORES (KPIs) ---
+            v_total = df_final[col_v_emp].sum()
+            
+            k1, k2, k3 = st.columns(3)
+            periodo_label = "no Ano" if mes_sel == "Todos" else f"em {mes_sel}/{ano_sel}"
+            
+            k1.metric(f"Total Identificado {periodo_label}", formatar_brl(v_total))
+            k2.metric("Qtd. de Registros", f"{len(df_final)} itens")
+            
+            media = v_total / len(df_final) if len(df_final) > 0 else 0
+            k3.metric("Média por Repasse", formatar_brl(media))
+
+            st.markdown("---")
+
+         if not df_final.empty:
+                # --- GRÁFICOS ---
+                g1, g2 = st.columns(2)
+                with g1:
+                    st.write("📈 **Top 10 Origens (Autores/Programas)**")
+                    if col_autor:
+                        # AGROUPAMENTO CORRIGIDO: [col_v_emp] fechado corretamente
+                        chart_aut = df_final.groupby(col_autor)[col_v_emp].sum().sort_values(ascending=False).head(10)
+                        st.bar_chart(chart_aut)
+                
+                with g2:
+                    st.write("📍 **Top 10 Destinos (Favorecidos/Cidades)**")
+                    if col_dest:
+                        # AGROUPAMENTO CORRIGIDO: [col_v_emp] fechado corretamente
+                        chart_dest = df_final.groupby(col_dest)[col_v_emp].sum().sort_values(ascending=False).head(10)
+                        st.bar_chart(chart_dest)
+
+                st.write("### 🔍 Detalhamento dos Registros")
+                st.dataframe(df_final, use_container_width=True)
