@@ -54,8 +54,20 @@ def exibir_gestao():
             color = '#ff4b4b' if val == 'expirado' else '#28a745'
             return f'color: {color}; font-weight: bold'
 
-        st.dataframe(df_usuarios.style.applymap(color_status, subset=['status']), use_container_width=True)
+      # Tabela de Controle
+        st.subheader("📋 Lista de Usuários e Status")
         
-        st.info("💡 Para alterar o status, atualize a planilha 'ID_LICENÇAS' no seu Google Drive.")
-    else:
-        st.warning("Não foi possível carregar a base de usuários.")
+        # Função de cores ajustada
+        def color_status(val):
+            if str(val).lower() == 'expirado':
+                return 'color: #ff4b4b; font-weight: bold'
+            elif str(val).lower() == 'ativo':
+                return 'color: #28a745; font-weight: bold'
+            return ''
+
+        # CORREÇÃO AQUI: Trocamos .applymap por .map
+        try:
+            st.dataframe(df_usuarios.style.map(color_status, subset=['status']), use_container_width=True)
+        except:
+            # Caso seu ambiente ainda use uma versão muito antiga, ele tenta o modo padrão
+            st.dataframe(df_usuarios, use_container_width=True)
