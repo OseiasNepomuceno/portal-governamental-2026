@@ -34,33 +34,29 @@ def executar():
 
     # --- LÓGICA DE EXIBIÇÃO DE CONTEÚDO ---
     
+    # --- LÓGICA DE NAVEGAÇÃO ---
     if escolha == "📊 Recursos":
         st.title("📊 Monitoramento de Recursos")
-        st.info("Este módulo está sendo integrado com a base de dados do Tesouro Nacional.")
-        # Aqui você chamaria a função do módulo de recursos
-        
-   elif escolha == "🏛️ Radar de Emendas":
+        st.info("Módulo em integração...")
+
+    elif escolha == "🏛️ Radar de Emendas":
         try:
             import radar_emendas_2026 as radar
-            # ALTERE A LINHA ABAIXO:
+            # Certifique-se que o arquivo radar_emendas_2026.py tem a função exibir_radar()
             radar.exibir_radar() 
         except Exception as e:
             st.error(f"Erro ao carregar módulo: {e}")
-            
-    elif escolha == "📜 Revisão de Estatuto":
-        st.title("📜 Revisor de Estatutos (IA)")
-        st.write("Suba o arquivo PDF do estatuto para análise de conformidade.")
-        # Aqui viria o seu código de análise de texto/PDF
-        
-    elif escolha == "⚙️ Gestão Administrativa":
-        st.title("⚙️ Configurações e Gestão")
-        st.write("Espaço reservado para cadastro de clientes e controle de acessos.")
-        
-    elif escolha == "🚪 Sair":
-        st.warning("Você solicitou o encerramento da sessão.")
-        if st.button("Confirmar Saída"):
-            st.write("Sessão encerrada com segurança. Até logo!")
-            st.stop()
 
+    elif escolha == "📜 Revisão de Estatuto":
+        st.title("📜 Revisão de Estatuto")
+        st.write("Área de análise de documentos.")
+
+    elif escolha == "⚙️ Gestão":
+        st.title("⚙️ Gestão Administrativa")
+        st.write("Configurações do sistema.")
+
+    elif escolha == "🚪 Sair":
+        st.warning("Encerrando sessão...")
+        st.stop()
 if __name__ == "__main__":
     executar()
