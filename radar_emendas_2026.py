@@ -33,20 +33,27 @@ def formatar_brl(valor):
     return f"R$ {valor:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
 
 def limpar_valor_monetario(v):
-    """Transforma 'R$ 1.250,50' em 1250.50 (float)"""
-    v = str(v).upper().replace('R$', '').replace(' ', '').replace('\xa0', '').strip()
-    if not v or v == 'NAN' or v == 'NONE': return 0.0
-    # Se tiver os dois (1.250,50), remove o ponto e troca vírgula por ponto
-    if '.' in v and ',' in v:
-        v = v.replace('.', '').replace(',', '.')
-    # Se tiver apenas vírgula (1250,50), troca por ponto
-    elif ',' in v:
-        v = v.replace(',', '.')
-    try:
-        return float(v)
-    except:
+    """Transforma qualquer sujeira como 'R$ 1.250,50' em 1250.50"""
+    if pd.isna(v) or v is None:
+        return 0.0
+    
+    # Converte para string e limpa tudo que não for número, vírgula ou ponto
+    v = str(v).upper().replace('R$', '').replace(' ', '').strip()
+    
+    if not v or v in ['NAN', 'NONE', 'NULL', '-']:
         return 0.0
 
+    try:
+        # Se tiver ponto e vírgula (ex: 1.250,50), remove o ponto e troca vírgula por ponto
+        if '.' in v and ',' in v:
+            v = v.replace('.', '').replace(',', '.')
+        # Se tiver apenas vírgula (ex: 1250,50), troca por ponto
+        elif ',' in v:
+            v = v.replace(',', '.')
+        
+        return float(v)
+    except Exception:
+        return 0.0
 def achar(df, termos):
     for col in df.columns:
         if all(t in col for t in termos): return col
