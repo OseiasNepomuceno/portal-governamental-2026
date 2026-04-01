@@ -13,34 +13,38 @@ def limpar_valor_monetario(v):
     except:
         return 0.0
 
-@st.cache_data(ttl=600)
+# Removi o @st.cache_data temporariamente para forçar a atualização
 def carregar_dados_drive():
     nome_arquivo = "20260320_Convenios.csv"
     file_id = st.secrets.get("file_id_convenios")
     url = f'https://drive.google.com/uc?id={file_id}'
     
     try:
-        if not os.path.exists(nome_arquivo):
-            gdown.download(url, nome_arquivo, quiet=True)
+        # Força o download sempre para garantir que o arquivo é o novo
+        if os.path.exists(nome_arquivo):
+            os.remove(nome_arquivo)
+        gdown.download(url, nome_arquivo, quiet=True)
         
-        # Leitura da base
         df = pd.read_csv(nome_arquivo, sep=';', encoding='latin1', on_bad_lines='skip')
         if len(df.columns) <= 1:
             df = pd.read_csv(nome_arquivo, sep=',', encoding='latin1', on_bad_lines='skip')
 
-        # Padroniza nomes das colunas para MAIÚSCULO e sem espaços
         df.columns = [str(c).strip().upper() for c in df.columns]
         
-        # --- TRATAMENTO DO ANO (Extração da Data 00/00/0000) ---
-        # Procura colunas que tenham DATA no nome para extrair o Ano
-        col_data_bruta = next((c for c in df.columns if 'DATA' in c or 'DT_' in c), None)
+        # --- EXTRAÇÃO DE ANO (LÓGICA REFORÇADA) ---
+        # Procura qualquer coluna que tenha 'DATA' ou 'DT'
+        col_data = next((c for c in df.columns if 'DATA' in c or 'DT' in c), None)
         
-        if col_data_bruta:
-            # Converte para formato de data e extrai o ano
-            df['ANO_FILTRO'] = pd.to_datetime(df[col_data_bruta], dayfirst=True, errors='coerce').dt.year
-            # Remove valores nulos e converte para texto (para o filtro ficar bonito)
+        if col_data:
+            # Tenta converter para data. Se falhar, tenta extrair os 4 últimos dígitos (ex: 01/01/2026 -> 2026)
+            df['ANO_FILTRO'] = pd.to_datetime(df[col_data], dayfirst=True, errors='coerce').dt.year
+            
+            # Se a conversão automática falhar (ficar vazio), tenta via String (pegar o final da data)
+            if df['ANO_FILTRO'].isnull().all():
+                df['ANO_FILTRO'] = df[col_data].astype(str).str.extract(r'(\d{4})')
+            
             df = df.dropna(subset=['ANO_FILTRO'])
-            df['ANO_FILTRO'] = df['ANO_FILTRO'].astype(int).astype(str)
+            df['ANO_FILTRO'] = df['ANO_FILTRO'].astype(float).astype(int).astype(str)
         
         return df
     except Exception as e:
@@ -48,24 +52,27 @@ def carregar_dados_drive():
         return pd.DataFrame()
 
 def exibir_radar():
-    st.title("🛰️ Radar de Recursos Governamentais")
-    st.caption("CORE ESSENCE - Filtros de Precisão Executiva")
+    st.title("🛰️ Radar de Recursos (Versão Corrigida)")
+    
+    # Botão para limpar cache manualmente se necessário
+    if st.button("🔄 Atualizar Dados do Drive"):
+        st.cache_data.clear()
+        st.rerun()
 
     df_base = carregar_dados_drive()
 
     if not df_base.empty:
-        # --- DEFINIÇÃO DAS COLUNAS ---
+        # Colunas Fixas conforme sua verificação
         col_valor = next((c for c in df_base.columns if 'VALOR' in c), None)
         col_ano = 'ANO_FILTRO' if 'ANO_FILTRO' in df_base.columns else None
-        col_uf = 'UF' if 'UF' in df_base.columns else None # Travado em UF como solicitado
+        col_uf = 'UF' if 'UF' in df_base.columns else None
         col_mun = next((c for c in df_base.columns if any(x in c for x in ['MUNICIPIO', 'CIDADE', 'MUNIC'])), None)
 
         if col_valor:
             df_base['VALOR_NUM'] = df_base[col_valor].apply(limpar_valor_monetario)
 
-        # --- INTERFACE DE FILTROS ---
-        st.markdown("### 🔍 Painel de Auditoria")
-        termo = st.text_input("1. Pesquisa Geral (Favorecido/Objeto):").upper()
+        st.markdown("### 🔍 Painel de Filtros")
+        termo = st.text_input("1. Busca Geral:").upper()
         
         c1, c2, c3 = st.columns(3)
         
@@ -81,33 +88,28 @@ def exibir_radar():
             opcoes_mun = ["Todos"] + sorted(df_base[col_mun].dropna().unique().astype(str).tolist()) if col_mun else ["Todos"]
             filtro_mun = st.selectbox("4. Cidade:", opcoes_mun)
 
-        # --- APLICAÇÃO DA FILTRAGEM ---
+        # --- FILTRAGEM ---
         df_f = df_base.copy()
-        
         if termo:
             mask = df_f.astype(str).apply(lambda x: x.str.contains(termo, case=False)).any(axis=1)
             df_f = df_f[mask]
-        
         if filtro_ano != "Todos":
             df_f = df_f[df_f[col_ano] == filtro_ano]
-            
         if filtro_uf != "Todos":
             df_f = df_f[df_f[col_uf] == filtro_uf]
-            
         if filtro_mun != "Todos":
             df_f = df_f[df_f[col_mun] == filtro_mun]
 
-        # --- EXIBIÇÃO DE INDICADORES ---
+        # --- INDICADORES ---
         st.markdown("---")
         k1, k2 = st.columns(2)
         if 'VALOR_NUM' in df_f.columns:
-            total_filtrado = df_f['VALOR_NUM'].sum()
-            k1.metric("Total Identificado", f"R$ {total_filtrado:,.2f}".replace(",", "X").replace(".", ",").replace("X", "."))
+            k1.metric("Total Identificado", f"R$ {df_f['VALOR_NUM'].sum():,.2f}".replace(",", "X").replace(".", ",").replace("X", "."))
         k2.metric("Registros", len(df_f))
 
         st.dataframe(df_f, use_container_width=True)
     else:
-        st.info("Aguardando carregamento da base 20260320_Convenios.csv...")
+        st.info("Carregando base... Verifique se o ID no Secrets está correto.")
 
 if __name__ == "__main__":
     exibir_radar()
