@@ -1,107 +1,94 @@
 import streamlit as st
-import requests
 import pandas as pd
-from io import BytesIO
-from reportlab.lib.pagesizes import letter
-from reportlab.pdfgen import canvas
-import datetime
+import gdown
+import os
 
+# --- FUNÇÃO DE LIMPEZA MONETÁRIA ---
+def limpar_valor_monetario(v):
+    if pd.isna(v) or str(v).strip() == "" or str(v).strip() == "0":
+        return 0.0
+    try:
+        v = str(v).upper().replace('R$', '').replace(' ', '').strip()
+        if ',' in v and '.' in v:
+            v = v.replace('.', '').replace(',', '.')
+        elif ',' in v:
+            v = v.replace(',', '.')
+        return float(v)
+    except:
+        return 0.0
 
-
-# --- FUNÇÃO DE BUSCA NA API DO GOVERNO ---
-@st.cache_data(ttl=3600)
-def buscar_dados_governo(codigo_ibge, ano, mes):
-    # BUSCA EXATA: Sincronizado com o nome que você salvou no Secrets
-    chave = st.secrets.get("chave-api-dados")
+# --- CARREGAMENTO DO ARQUIVO ESPECÍFICO DO DRIVE ---
+@st.cache_data(ttl=600) # Atualiza a cada 10 minutos se o arquivo mudar no Drive
+def carregar_dados_drive():
+    # Nome exato do arquivo que você definiu
+    nome_arquivo = "20260320_Convenios.csv"
     
-    if not chave:
-        st.error("🚨 Erro: A chave 'chave-api-dados' não foi encontrada nos Secrets do Streamlit.")
-        return []
-
-    # Limpeza de segurança (remove aspas ou espaços acidentais)
-    token = str(chave).strip().replace('"', '').replace("'", "")
-    
-    # Formato MM/AAAA (Padrão exigido pelo Portal da Transparência)
-    data_formatada = f"{mes}/{ano}"
-    
-    url = "https://api.portaldatransparencia.gov.br/api-de-dados/transferencias/por-municipio"
-    
-    # CORREÇÃO DE IDENTAÇÃO AQUI (Linha 30)
-    headers = {
-        "chave-api-dados": token,
-        "Accept": "application/json",
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
-        "Referer": "https://portaldatransparencia.gov.br/"
-    }
-    
-    params = {
-        "codigoIbge": codigo_ibge,
-        "mesAno": data_formatada,
-        "pagina": 1
-    }
+    # IMPORTANTE: Certifique-se que o ID abaixo corresponde ao arquivo 20260320_Convenios.csv
+    # Se o ID mudar, basta substituir aqui
+    file_id = '13Ekq0dn38mZ99Zz_V5zYmW7og3hS24cN' 
+    url = f'https://drive.google.com/uc?id={file_id}'
     
     try:
-        res = requests.get(url, headers=headers, params=params, timeout=30)
+        if not os.path.exists(nome_arquivo):
+            gdown.download(url, nome_arquivo, quiet=True)
         
-        if res.status_code == 200:
-            return res.json()
-        elif res.status_code == 403:
-            st.error(f"🚫 Erro 403: Acesso negado pelo Governo para a data {data_formatada}.")
-            st.info("Sua chave foi reconhecida, mas o servidor do governo ainda está processando a autorização.")
-            return []
-        else:
-            st.error(f"Erro {res.status_code} na API Federal. Verifique os parâmetros.")
-            return []
+        # Leitura com tratamento de encoding para arquivos brasileiros (latin1 ou utf-8)
+        df = pd.read_csv(nome_arquivo, sep=';', encoding='latin1', on_bad_lines='skip')
+        
+        # Padronização de colunas (Ajuste conforme os nomes reais no seu CSV)
+        # Vamos tentar identificar colunas de valor e data automaticamente
+        df.columns = [c.strip().upper() for c in df.columns]
+        
+        return df
     except Exception as e:
-        st.error(f"Falha técnica de conexão: {e}")
-        return []
+        st.error(f"Erro ao carregar {nome_arquivo}: {e}")
+        return pd.DataFrame()
 
-# --- INTERFACE PRINCIPAL ---
 def exibir_radar():
-    st.title("🛰️ Radar de Recursos Governamentais")
-    st.caption("CORE ESSENCE - Inteligência em Dados Públicos em Tempo Real")
+    st.title("🛰️ Monitoramento de Recursos (Base: 20260320)")
+    st.caption("CORE ESSENCE - Inteligência de Dados Atualizada")
 
-    # --- PARÂMETROS DE BUSCA NA ÁREA PRINCIPAL (Não na Sidebar) ---
-    st.markdown("### 📍 Parâmetros de Busca")
-    c1, c2, c3 = st.columns([2, 1, 1]) # Cria colunas para os filtros ficarem bonitos
-    
-    with c1:
-        ibge = st.text_input("Código IBGE do Município", value="3541406", key="ibge_input")
-    with c2:
-        ano = st.selectbox("Ano", [2026, 2025, 2024], index=0, key="ano_input")
-    with c3:
-        mes = st.selectbox("Mês", [f"{i:02d}" for i in range(1, 13)], index=0, key="mes_input")
-    
-    # Botão centralizado
-    btn_radar = st.button("🚀 Rastrear Recursos Agora", use_container_width=True)
+    df_base = carregar_dados_drive()
 
-    if btn_radar:
-        with st.spinner(f"Consultando base federal de {mes}/{ano}..."):
-            resultados = buscar_dados_governo(ibge, ano, mes)
+    if not df_base.empty:
+        # Identificando colunas dinamicamente
+        col_valor = next((c for c in df_base.columns if 'VALOR' in c), None)
+        col_favorecido = next((c for c in df_base.columns if 'FAVORECIDO' in c), None)
+        col_tipo = next((c for c in df_base.columns if 'TIPO' in c), None)
+
+        if col_valor:
+            df_base['VALOR_NUM'] = df_base[col_valor].apply(limpar_valor_monetario)
+        
+        # --- ÁREA DE FILTROS ---
+        st.markdown("### 🔍 Pesquisa Rápida")
+        termo = st.text_input("Filtrar por Favorecido ou Tipo de Recurso:", "").upper()
+        
+        df_filtrado = df_base
+        if termo:
+            mask = df_base.astype(str).apply(lambda x: x.str.contains(termo, case=False)).any(axis=1)
+            df_filtrado = df_base[mask]
+
+        # --- EXIBIÇÃO DE RESULTADOS ---
+        c1, c2 = st.columns(2)
+        if 'VALOR_NUM' in df_filtrado.columns:
+            total = df_filtrado['VALOR_NUM'].sum()
+            valor_formatado = f"R$ {total:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+            c1.metric("Total Identificado", valor_formatado)
+        
+        c2.metric("Registros Encontrados", len(df_filtrado))
+
+        st.markdown("---")
+        st.subheader("📋 Detalhamento dos Dados")
+        
+        # Seleciona apenas as colunas mais importantes para não poluir a tela
+        colunas_uteis = [c for c in [col_tipo, col_favorecido, col_valor] if c is not None]
+        if not colunas_uteis:
+            colunas_uteis = df_filtrado.columns[:4] # Mostra as 4 primeiras se não achar nomes padrão
             
-            if resultados:
-                df = pd.DataFrame(resultados)
-                
-                # Tratamento de Valores
-                if 'valor' in df.columns:
-                    df['valor'] = pd.to_numeric(df['valor'], errors='coerce').fillna(0)
-                
-                total = df['valor'].sum() if 'valor' in df.columns else 0
-                
-                st.success("✅ Dados obtidos com sucesso!")
-                
-                # KPIs em destaque
-                k1, k2 = st.columns(2)
-                valor_formatado = f"R$ {total:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
-                k1.metric("Total Identificado", valor_formatado)
-                k2.metric("Nº de Repasses", len(df))
+        st.dataframe(df_filtrado[colunas_uteis], use_container_width=True)
 
-                st.markdown("---")
-                st.subheader("📋 Detalhamento das Transferências")
-                
-                colunas_vistas = ['tipoTransferencia', 'favorecido', 'valor', 'origemRecurso']
-                colunas_finais = [c for c in colunas_vistas if c in df.columns]
-                
-                st.dataframe(df[colunas_finais], use_container_width=True)
-            else:
-                st.info(f"Nenhum dado encontrado para {mes}/{ano}. Tente um mês anterior (ex: 12/2025).")
+    else:
+        st.warning("Aguardando carregamento da base 20260320_Convenios.csv...")
+
+if __name__ == "__main__":
+    exibir_radar()
