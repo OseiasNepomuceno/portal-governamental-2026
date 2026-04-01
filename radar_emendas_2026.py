@@ -59,7 +59,6 @@ def exibir_radar():
     with st.spinner("🛰️ Sincronizando dados CORE ESSENCE..."):
         df_base, msg = carregar_dados_drive(id_chave)
     
-    # --- BLOCO DA LINHA 43 - ALINHAMENTO REVISADO ---
     if df_base is not None:
         col_v_emp = achar(df_base, ["VALOR", "RECEBIDO"]) or achar(df_base, ["VALOR", "EMPENHADO"]) or achar(df_base, ["VALOR", "REPASSE"])
         col_v_pag = achar(df_base, ["VALOR", "PAGO"]) or col_v_emp
@@ -67,40 +66,31 @@ def exibir_radar():
         col_dest  = achar(df_base, ["FAVORECIDO"]) or achar(df_base, ["MUNICÍPIO"])
         col_tempo = achar(df_base, ["ANO", "MÊS"]) or achar(df_base, ["ANO"])
 
-      if col_v_emp:
-          # 1. Tratamento Numérico
+        if col_v_emp:
+            # 1. Tratamento Numérico
             df_base[col_v_emp] = df_base[col_v_emp].astype(str).str.replace('.', '', regex=False).str.replace(',', '.', regex=False)
             df_base[col_v_emp] = pd.to_numeric(df_base[col_v_emp], errors='coerce').fillna(0)
 
-            # 2. SEPARAÇÃO E LIMPEZA DE ANO E MÊS
+            # 2. Separação de Ano/Mês (Lógica Anti-Erro)
             if col_tempo:
-                # Converte para string e limpa espaços extras antes de quebrar a barra
                 df_base[col_tempo] = df_base[col_tempo].astype(str).str.strip()
-                
-                # Divide '2026/01' em duas partes
-                datas_separadas = df_base[col_tempo].str.split('/', expand=True)
-                
-                if datas_separadas.shape[1] == 2:
-                    # .str.strip() remove espaços ocultos que impedem o filtro de funcionar
-                    df_base['ANO_REF'] = datas_separadas[0].str.strip()
-                    df_base['MES_REF'] = datas_separadas[1].str.strip()
+                datas = df_base[col_tempo].str.split('/', expand=True)
+                if datas.shape[1] == 2:
+                    df_base['ANO_REF'] = datas[0].str.strip()
+                    df_base['MES_REF'] = datas[1].str.strip()
                 else:
                     df_base['ANO_REF'] = df_base[col_tempo]
                     df_base['MES_REF'] = "Todos"
 
-            # 3. FILTRAGEM (Garantindo que tudo seja comparado como Texto Limpo)
+            # 3. Filtragem (Comparação Limpa)
             df_final = df_base
-            
-            # Filtro de Ano
             if 'ANO_REF' in df_base.columns:
                 df_final = df_base[df_base['ANO_REF'] == str(ano_sel).strip()]
             
-            # Filtro de Mês
             if mes_sel != "Todos" and 'MES_REF' in df_base.columns:
-                # Aqui comparamos o que o usuário selecionou com a coluna limpa
                 df_final = df_final[df_final['MES_REF'] == str(mes_sel).strip()]
 
-            # --- CARDS DE INDICADORES (KPIs) ---
+            # --- CARDS DE INDICADORES ---
             v_total = df_final[col_v_emp].sum()
             k1, k2, k3 = st.columns(3)
             label = "no Ano" if mes_sel == "Todos" else f"em {mes_sel}/{ano_sel}"
@@ -129,7 +119,7 @@ def exibir_radar():
                 st.write("### 🔍 Detalhamento")
                 st.dataframe(df_final, use_container_width=True)
             else:
-                st.warning("Nenhum dado encontrado para o período.")
+                st.warning(f"Nenhum dado encontrado para {mes_sel}/{ano_sel}.")
         else:
             st.error("Coluna de valor não encontrada.")
     else:
