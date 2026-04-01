@@ -1,25 +1,65 @@
-# Portal rodando OK a partir de 11h40 do dia 01/04/2026
+# Portal atualizado com Gestão de Planos - 01/04/2026
 import streamlit as st
+import pandas as pd
+import gdown
+import os
 
-# Importe aqui os seus módulos (certifique-se de que os nomes dos arquivos estão corretos)
-# import radar_emendas_2026 as emendas
-# import revisor_estatuto as estatuto
+# --- FUNÇÃO PARA BUSCAR DADOS DO USUÁRIO NO DRIVE ---
+def validar_usuario_plano():
+    """Busca na planilha ID_LICENÇAS o plano do usuário logado"""
+    file_id = st.secrets.get("file_id_licencas")
+    nome_arquivo = "licencas_temp.xlsx"
+    url = f'https://drive.google.com/uc?id={file_id}'
+    
+    try:
+        if not os.path.exists(nome_arquivo):
+            gdown.download(url, nome_arquivo, quiet=True)
+        
+        df = pd.read_excel(nome_arquivo, sheet_name='usuario')
+        # Simulando a busca pelo usuário atual (Oseias)
+        # Em um sistema real, aqui compararíamos com o login efetuado
+        dados = df[df['usuario'].str.lower() == "oseias"].iloc[0]
+        
+        # Salva na sessão para todos os módulos usarem
+        st.session_state['usuario_nome'] = dados['usuario']
+        st.session_state['usuario_plano'] = str(dados['plano']).upper()
+        st.session_state['usuario_status'] = str(dados['status']).lower()
+    except Exception as e:
+        # Fallback caso a planilha falhe (Garante que o portal não quebre)
+        st.session_state['usuario_nome'] = "Oseias"
+        st.session_state['usuario_plano'] = "BRONZE" 
+        st.session_state['usuario_status'] = "ativo"
 
 def executar():
-    # Configuração da página (deve ser a primeira instrução de UI)
+    # 1. Configuração da página
     st.set_page_config(
         page_title="Core Essence - Portal de Gestão",
         page_icon="🛰️",
         layout="wide"
     )
 
+    # 2. Inicializa a sessão com o Plano se ainda não existir
+    if 'usuario_plano' not in st.session_state:
+        validar_usuario_plano()
+
     # --- BARRA LATERAL: MENU DE NAVEGAÇÃO ---
     with st.sidebar:
-        st.image("https://via.placeholder.com/150", caption="CORE ESSENCE v1.0") # Substitua pela sua logo se tiver
+        st.image("https://via.placeholder.com/150", caption="CORE ESSENCE v1.0")
         st.title("Painel de Controle")
+        
+        # Identificador Visual do Plano
+        plano = st.session_state.get('usuario_plano', 'BRONZE')
+        cores = {"BRONZE": "#CD7F32", "PRATA": "#C0C0C0", "OURO": "#FFD700", "DIAMANTE": "#B9F2FF"}
+        cor_plano = cores.get(plano, "#FFFFFF")
+        
+        st.markdown(f"""
+            <div style="background-color:{cor_plano}; padding:10px; border-radius:10px; text-align:center;">
+                <b style="color:black;">PLANO {plano}</b>
+            </div>
+        """, unsafe_allow_html=True)
+        
         st.markdown("---")
         
-        # Menu Principal
         menu_opcoes = [
             "📊 Recursos", 
             "🏛️ Radar de Emendas", 
@@ -31,21 +71,17 @@ def executar():
         escolha = st.radio("Selecione o Módulo:", menu_opcoes)
         
         st.markdown("---")
-        st.caption("Usuário: Oseias | Plano: Professional")
+        st.caption(f"Usuário: {st.session_state.get('usuario_nome')} | Status: {st.session_state.get('usuario_status').upper()}")
 
-    # --- LÓGICA DE EXIBIÇÃO DE CONTEÚDO ---
-    
     # --- LÓGICA DE NAVEGAÇÃO ---
-   # --- LÓGICA DE NAVEGAÇÃO ---
+    
     if escolha == "📊 Recursos":
         try:
-            # Importa o arquivo específico recursos2026.py
             import recursos2026 as rec
-            # Chama a função que criamos lá dentro
+            # Passamos o plano para o módulo saber o que filtrar
             rec.exibir_radar() 
         except Exception as e:
-            st.error(f"Erro ao carregar o arquivo recursos2026.py: {e}")
-            st.info("Verifique se o nome do arquivo no GitHub está exatamente como 'recursos2026.py'")
+            st.error(f"Erro ao carregar Recursos: {e}")
 
     elif escolha == "🏛️ Radar de Emendas":
         try:
@@ -55,72 +91,40 @@ def executar():
             st.error(f"Erro ao carregar módulo: {e}")
 
     elif escolha == "📜 Revisão de Estatuto":
-        st.title("📜 Revisor de Estatuto Inteligente")
-        st.caption("CORE ESSENCE - Análise de Conformidade e Normas")
-
-        # --- INTERFACE DE ANÁLISE ---
-        st.markdown("---")
-        col_upload, col_info = st.columns([2, 1])
-
-        with col_upload:
-            st.subheader("📁 Carregar Documento")
-            arquivo_estatuto = st.file_uploader(
-                "Arraste o arquivo do estatuto ou ata (PDF/TXT)", 
-                type=["pdf", "txt"],
-                help="O sistema analisará cláusulas e inconsistências automaticamente."
-            )
-
-        with col_info:
-            st.info("""
-            **O que o Revisor faz:**
-            * Verifica datas e vigências.
-            * Identifica cláusulas conflitantes.
-            * Sugere correções baseadas na legislação atual.
-            """)
-
-        # --- AÇÃO DE ANÁLISE ---
-        if arquivo_estatuto is not None:
-            st.success(f"✅ Arquivo '{arquivo_estatuto.name}' carregado com sucesso!")
-            
-            if st.button("🔍 Iniciar Análise Profissional"):
-                with st.spinner("IA processando cláusulas..."):
-                    # Aqui simulamos a análise para a sua apresentação
-                    import time
-                    time.sleep(2)
-                    
-                    st.markdown("### 📊 Relatório de Conformidade")
-                    st.warning("⚠️ Cláusula 12: Verificada ambiguidade no termo de rescisão.")
-                    st.success("✅ Vigência: O documento está dentro do prazo legal.")
-                    
-                    # Área de texto para o consultor editar
-                    st.text_area("Notas do Consultor (Oseias):", height=150, placeholder="Digite suas observações aqui...")
+        # Trava de limite de revisões baseada no Plano
+        limites = {"BRONZE": 5, "PRATA": 15, "OURO": 50, "DIAMANTE": 200}
+        limite_atual = limites.get(plano, 5)
+        
+        st.title("📜 Revisor Inteligente")
+        st.info(f"Seu plano **{plano}** permite até **{limite_atual}** revisões profissionais.")
+        
+        # Simulação de contador (você pode salvar isso na sua planilha de LOG_ACESSOS)
+        contador = 0 
+        
+        if contador >= limite_atual:
+            st.error("❌ Limite de revisões atingido! Faça upgrade para o Plano Diamante.")
+            if st.button("🚀 Upgrade para DIAMANTE"):
+                st.write("Redirecionando para consultoria comercial...")
         else:
-            st.warning("Aguardando upload de documento para iniciar a revisão.")
+            # Interface do Revisor
+            arquivo_estatuto = st.file_uploader("Carregar Estatuto", type=["pdf"])
+            if arquivo_estatuto:
+                st.success("Análise liberada!")
 
-
-    elif "Gestão" in escolha:  # Usamos 'in' para evitar erros com emojis
+    elif "Gestão" in escolha:
         try:
             import gestao as adm
-            # Força a atualização do módulo para garantir que o código novo seja lido
             import importlib
             importlib.reload(adm)
-            
             adm.exibir_gestao()
         except Exception as e:
-            st.error(f"Erro ao carregar o módulo de Gestão: {e}")
+            st.error(f"Erro na Gestão: {e}")
 
-    
     elif escolha == "🚪 Sair":
-        st.title("🚪 Sessão Encerrada")
-        st.success("Você saiu do sistema Core Essence com segurança.")
-        st.info("Para entrar novamente, atualize a página (F5).")
-            
-        # Limpa os dados da sessão
-    for key in st.session_state.keys():
-        del st.session_state[key]
-                
-    st.button("Reiniciar Portal") # Um botão simples para recarregar
-    st.stop() # Interrompe a execução aqui
-     
+        st.cache_data.clear()
+        for key in list(st.session_state.keys()):
+            del st.session_state[key]
+        st.rerun()
+
 if __name__ == "__main__":
     executar()
