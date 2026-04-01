@@ -58,7 +58,7 @@ def buscar_dados_governo(codigo_ibge, ano, mes):
         return []
 
 # --- INTERFACE PRINCIPAL ---
-def executar():
+def exibir_radar():
     st.title("🛰️ Radar de Recursos Governamentais")
     st.caption("CORE ESSENCE - Inteligência em Dados Públicos em Tempo Real")
 
@@ -102,5 +102,4 @@ def executar():
             else:
                 st.info(f"Nenhum dado encontrado para {mes}/{ano}. Tente um mês anterior (ex: 12/2025).")
 
-if __name__ == "__main__":
-    executar()
+if __name__ == "__main__": exibir_radar()
