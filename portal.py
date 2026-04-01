@@ -120,20 +120,7 @@ def executar():
         except Exception as e:
             st.error(f"Erro na Gestão: {e}")
 
-  elif escolha == "🚪 Sair":
-        st.title("🚪 Sessão Encerrada")
-        st.success("Você saiu do sistema Core Essence com segurança.")
-        
-        # 1. Limpa o cache de dados do navegador e do servidor
+ elif escolha == "🚪 Sair":
+        st.session_state.clear()
         st.cache_data.clear()
-        
-        # 2. Limpa todas as variáveis de controle (Login, Plano, Status)
-        for key in list(st.session_state.keys()):
-            del st.session_state[key]
-        
-        # 3. Botão para retornar ao início (Reset manual)
-        if st.button("Acessar Novamente"):
-            st.rerun()
-
-        st.info("Para garantir a segurança, feche esta aba do navegador.")
-        st.stop() # Interrompe qualquer execução residual abaixo
+        st.rerun()
