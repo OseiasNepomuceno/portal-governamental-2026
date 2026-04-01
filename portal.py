@@ -27,18 +27,23 @@ def autenticar_usuario(usuario_digitado, senha_digitada):
         user_row = df[(df['usuario'].astype(str) == str(usuario_digitado)) & 
                       (df['senha'].astype(str) == str(senha_digitada))]
         
-        if not user_row.empty:
+    if not user_row.empty:
+            # Pegamos a primeira linha encontrada
             dados = user_row.iloc[0]
-            if str(dados['status']).lower() == 'ativo':
+            
+            # Buscamos as colunas independente de estarem MAIÚSCULAS ou minúsculas
+            # O .get() tenta pegar 'plano', se não achar tenta 'PLANO'
+            plano_bruto = dados.get('plano', dados.get('PLANO', 'BRONZE'))
+            status_bruto = dados.get('status', dados.get('STATUS', 'ativo'))
+
+            if str(status_bruto).lower().strip() == 'ativo':
                 st.session_state['logado'] = True
-                st.session_state['usuario_nome'] = dados['usuario']
-                st.session_state['usuario_plano'] = str(dados['plano']).upper()
+                st.session_state['usuario_nome'] = dados.get('usuario', dados.get('USUARIO', 'Consultor'))
+                st.session_state['usuario_plano'] = str(plano_bruto).upper().strip()
                 st.session_state['usuario_status'] = 'ativo'
                 return True
             else:
-                st.error("⚠️ Esta conta está EXPIRADA. Entre em contato com o suporte.")
-        else:
-            st.error("❌ Usuário ou senha incorretos.")
+                st.error("⚠️ Esta conta está EXPIRADA no sistema.")
     except Exception as e:
         st.error(f"Erro ao conectar com base de dados: {e}")
     return False
