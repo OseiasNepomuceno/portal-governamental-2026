@@ -106,10 +106,10 @@ def executar():
             
         # Limpa os dados da sessão
     for key in st.session_state.keys():
-    del st.session_state[key]
+        del st.session_state[key]
                 
-        st.button("Reiniciar Portal") # Um botão simples para recarregar
-        st.stop() # Interrompe a execução aqui
+    st.button("Reiniciar Portal") # Um botão simples para recarregar
+    st.stop() # Interrompe a execução aqui
      
 if __name__ == "__main__":
     executar()
