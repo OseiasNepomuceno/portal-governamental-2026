@@ -99,17 +99,17 @@ def executar():
     elif escolha == "⚙️ Gestão":
         st.title("⚙️ Gestão Administrativa")
         st.write("Configurações do sistema.")
-
-     elif escolha == "🚪 Sair":
-            st.title("🚪 Sessão Encerrada")
-            st.success("Você saiu do sistema Core Essence com segurança.")
-            st.info("Para entrar novamente, atualize a página (F5).")
+    elif escolha == "🚪 Sair":
+        st.title("🚪 Sessão Encerrada")
+        st.success("Você saiu do sistema Core Essence com segurança.")
+        st.info("Para entrar novamente, atualize a página (F5).")
             
-            # Limpa os dados da sessão
-            for key in st.session_state.keys():
-                del st.session_state[key]
+        # Limpa os dados da sessão
+        for key in st.session_state.keys():
+        del st.session_state[key]
                 
-            st.button("Reiniciar Portal") # Um botão simples para recarregar
-            st.stop() # Interrompe a execução aqui
+        st.button("Reiniciar Portal") # Um botão simples para recarregar
+        st.stop() # Interrompe a execução aqui
+     
 if __name__ == "__main__":
     executar()
