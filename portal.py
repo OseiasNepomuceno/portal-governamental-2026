@@ -105,8 +105,8 @@ def executar():
         st.info("Para entrar novamente, atualize a página (F5).")
             
         # Limpa os dados da sessão
-        for key in st.session_state.keys():
-        del st.session_state[key]
+    for key in st.session_state.keys():
+    del st.session_state[key]
                 
         st.button("Reiniciar Portal") # Um botão simples para recarregar
         st.stop() # Interrompe a execução aqui
