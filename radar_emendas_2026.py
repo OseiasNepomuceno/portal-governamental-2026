@@ -35,10 +35,9 @@ def achar(df, termos):
     return None
 
 def exibir_radar():
-    """Esta função desenha APENAS o conteúdo do Radar, sem Sidebar"""
+    """Esta função desenha o conteúdo do Radar com mapeamento ultra-flexível"""
     st.title("🏛️ Radar de Emendas Parlamentares")
     
-    # Filtros em colunas no topo da página (Área Principal)
     col_f1, col_f2, col_f3 = st.columns(3)
     with col_f1:
         fonte_sel = st.selectbox("Base de Dados:", list(FONTES_DADOS.keys()))
@@ -51,29 +50,51 @@ def exibir_radar():
             mes_sel = st.selectbox("Mês de Referência", meses)
 
     id_chave = FONTES_DADOS[fonte_sel]
-    with st.spinner("🛰️ Sincronizando dados..."):
+    with st.spinner("🛰️ Sincronizando dados estratégicos..."):
         df_base, msg = carregar_dados_drive(id_chave)
     
     if df_base is not None:
-        col_v_emp = achar(df_base, ["VALOR", "EMPENHADO"]) or achar(df_base, ["VALOR", "REPASSE"])
-        col_v_pag = achar(df_base, ["VALOR", "PAGO"])
+        # --- DICIONÁRIO DE MAPEAMENTO DINÂMICO ---
+        # Ele tenta encontrar a primeira coluna que contenha esses termos
+        col_v_emp = achar(df_base, ["VALOR", "EMPENHADO"]) or \
+                    achar(df_base, ["VALOR", "REPASSE"]) or \
+                    achar(df_base, ["VALOR", "EMENDA"]) or \
+                    achar(df_base, ["VALOR", "CONVENIO"])
+        
+        col_v_pag = achar(df_base, ["VALOR", "PAGO"]) or achar(df_base, ["VALOR", "LIQUIDADO"])
+        
         col_autor = achar(df_base, ["NOME", "AUTOR"]) or achar(df_base, ["PARLAMENTAR"])
-        col_mun   = achar(df_base, ["MUNICÍPIO"]) or achar(df_base, ["MUNICIPIO"])
+        
+        # Para a base de Favorecido, o "Destino" é o Nome do Favorecido
+        col_dest  = achar(df_base, ["NOME", "FAVORECIDO"]) or \
+                    achar(df_base, ["MUNICÍPIO"]) or \
+                    achar(df_base, ["MUNICIPIO"]) or \
+                    achar(df_base, ["BENEFICIARIO"])
+
         col_ano   = achar(df_base, ["ANO", "EMENDA"]) or achar(df_base, ["ANO"])
         col_mes   = achar(df_base, ["MES"])
 
+        # Se ele achou pelo menos uma coluna de VALOR, o código segue:
         if col_v_emp:
+            # Limpeza de dados numéricos
             for c in [col_v_emp, col_v_pag]:
                 if c:
                     df_base[c] = df_base[c].astype(str).str.replace('.', '', regex=False).str.replace(',', '.', regex=False)
                     df_base[c] = pd.to_numeric(df_base[c], errors='coerce').fillna(0)
 
-            df_ano = df_base[df_base[col_ano] == ano_sel] if col_ano in df_base.columns else df_base
+            # --- FILTRAGEM ---
+            # Filtro de Ano
+            if col_ano in df_base.columns:
+                df_ano = df_base[df_base[col_ano] == ano_sel]
+            else:
+                df_ano = df_base # Se não houver coluna de ano, mostra tudo
+            
+            # Filtro de Mês
             df_final = df_ano
             if fonte_sel != "Visão Geral (Emendas)" and mes_sel != "Todos" and col_mes:
                 df_final = df_ano[df_ano[col_mes] == mes_sel]
 
-            # Cards Superiores
+            # --- CARDS DE INDICADORES ---
             v_acumulado = df_ano[col_v_emp].sum()
             v_f_emp = df_final[col_v_emp].sum()
             v_f_pag = df_final[col_v_pag].sum() if col_v_pag else 0
@@ -81,18 +102,28 @@ def exibir_radar():
             k1, k2, k3 = st.columns(3)
             label_p = "no Ano" if fonte_sel == "Visão Geral (Emendas)" else f"em {mes_sel}"
             k1.metric(f"Total Acumulado ({ano_sel})", formatar_brl(v_acumulado))
-            k2.metric(f"Reservado {label_p}", formatar_brl(v_f_emp))
-            k3.metric(f"Pago {label_p}", formatar_brl(v_f_pag))
+            k2.metric(f"Valor Identificado {label_p}", formatar_brl(v_f_emp))
+            k3.metric(f"Valor Pago {label_p}", formatar_brl(v_f_pag))
 
             st.markdown("---")
 
             if not df_final.empty:
                 g1, g2 = st.columns(2)
                 with g1:
-                    if col_autor: st.write("📈 **Top Autores**"); st.bar_chart(df_final.groupby(col_autor)[col_v_emp].sum().sort_values(ascending=False).head(10))
+                    st.write("📈 **Top 10 Origens (Autores/Programas)**")
+                    c_origem = col_autor if col_autor else df_base.columns[0]
+                    st.bar_chart(df_final.groupby(c_origem)[col_v_emp].sum().sort_values(ascending=False).head(10))
+                
                 with g2:
-                    if col_mun: st.write("📍 **Top Municípios**"); st.bar_chart(df_final.groupby(col_mun)[col_v_emp].sum().sort_values(ascending=False).head(10))
-                st.write("### 🔍 Detalhamento")
+                    st.write("📍 **Top 10 Destinos (Favorecidos/Municípios)**")
+                    c_dest = col_dest if col_dest else df_base.columns[1]
+                    st.bar_chart(df_final.groupby(c_dest)[col_v_emp].sum().sort_values(ascending=False).head(10))
+
+                st.write("### 🔍 Detalhamento dos Registros")
                 st.dataframe(df_final, use_container_width=True)
-        else: st.error("Erro de mapeamento de colunas.")
-    else: st.error(msg)
+            else:
+                st.warning("Nenhum dado encontrado para os filtros selecionados.")
+        else:
+            st.error(f"⚠️ Erro crítico: Não encontramos colunas de VALOR neste arquivo. Colunas lidas: {list(df_base.columns)}")
+    else:
+        st.error(msg)
