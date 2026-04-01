@@ -1,3 +1,4 @@
+# Portal rodando OK a partir de 11h40 do dia 01/04/2026
 import streamlit as st
 
 # Importe aqui os seus módulos (certifique-se de que os nomes dos arquivos estão corretos)
