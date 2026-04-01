@@ -45,6 +45,8 @@ def carregar_dados_drive():
         st.error(f"Erro ao processar base: {e}")
         return pd.DataFrame()
 
+plano = st.session_state.get('usuario_plano', 'BRONZE')
+
 def exibir_radar():
     st.title("🛰️ Radar de Recursos (Alta Performance)")
     
