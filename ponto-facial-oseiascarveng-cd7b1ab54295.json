@@ -1,0 +1,13 @@
+{
+  "type": "service_account",
+  "project_id": "ponto-facial-oseiascarveng",
+  "private_key_id": "cd7b1ab54295477531f1ff29fda01b7328101d55",
+  "private_key": "-----BEGIN PRIVATE KEY-----\nMIIEuwIBADANBgkqhkiG9w0BAQEFAASCBKUwggShAgEAAoIBAQD3qHbStc4X4vHL\nnBzZTlASsN2/kIMYmf7/WPDBVoui/Y7XrcPsQbw/470jKQdG3Ymb3C2j0HcjzRg7\nqWJt/XpvMJd7rXt7PqqDDrtOGXaScwn9vso8Kq24BIOK0GYMG+vA7Lo8iddjQHUw\noqh+QZ/krwKsdD3pI1z4JBUnHq50Y5A+4+bUaGSx+GyveNxDGFxiU3KZVD5+EmWT\nvO/PeV1jMRbvRpWID0H07PK0lqV9zmE0X/ozlqwk3vJjFZQgy4fhJ9ZMHdlraykt\n5KBBNykTkutW4Rvl13v6+Ei8z68mQ2hoYom7vk0SgYkGmZFM41actxUBlI7AUzpe\nTgzsucbJAgMBAAECggEAD8gu15tO/dtazenYi3SKdRZ2RcM0x3g7dWmP4LzeJc3Y\nsMqEULruVHfz0UNyZkQEhT0mX2kPyTqZpRD/PRkeberVIcQwDpjeDtSn1QCZu21p\n9pSWQ01I8rq+6IqtO2+lZLmb3fMUGba9gRLsf9c4vume1v81WXUFHf8BUL6LdCPV\nXBjGcnD9mopxRSyh5uIkyfzaPKebub1qSyfygIlJW0Yo/HHi2tnOq9/2Uo9da4G1\n9wHSFkGm4bFpqVjV5eBFnz+m2qIAb5jWjNoKFUIaAZ9muZ4FEbnHsVoR/DugHPCt\nIzwxQd8rjtP4Sk5B5TGJE4v7foYnMYfAzFbGghzO8QKBgQD9TsORbIIQ0WS1Dhnw\nzFwP3SdfgSPhChHJcLDxGhVTn23toTkenxDCbEBQFmyfxXszrHf4jNP4VoDEQ8kg\nmGvmGRDt2jHAnSXw76hnj0X5iU0e2d8eVRi3W096qxBcklReXNhdILI7jfppk9IE\nI+hSEMCBxIZbXdKmAWoXfJL3ZQKBgQD6SlP0Mdle4Nb+NSUxafEjItogSIWBOs2L\n+wZq2V13JZpSMb2oJfxXV45xtgc02G/bU9D5IFSAO8lt9+o8us+smXINL5Dm6dun\n5+RN0xfJfwe5QpYQdfJlYRbApZ8ZftHBKtz1Fhtd1WNbyhMo/gZ2woj44Us60jsh\nI0a4BkqVlQKBgQCxC5IpXHv0IUaQPZDn+w4FkH9qgyp+qbkQ4JDrk12AmxgMVPlF\na8wc9+hjkajOawrXbR5VPKkTE/LgOrii7aXMp4xrkmvfwna4VemQqFUyOkMK4yDN\nZJDn5wxAIrxG14fchGw9exLYCT4S+Nx7RFWmtkq26JM33PXUTXzHeayG+QJ/WPgS\n37rYieFiivpZPjdqgBLjdpZQ3p8IcbnJjjG2B6RWNuF3iU33ZRS6jbEm3qIRIOWq\nYuQbJXobH/wAR5YgPDpPUGCYIXz/l6/Wd9ORoQ6GsFP7A97pSyA39kLpSybJaODT\nqksxbylrKDWsmeWyZoTAK7fqBf61BhKEEOYrnQKBgGK+UaidEnTzzsd/Ltr2MpWm\nv2/K6ihoz4xMzq2stjToKgf/7zUaxEAiKpbmx27nXJ0wbNv/APWuUBBHWuGojJi6\nOp621Nhy+N+mkZ/gIu6VsjM1SNPjUnEboyI+MGd7pp0VK8ZEYyRhIWMPeX5zE6TL\nbnP6Z2+EvCmjkV7mTJQC\n-----END PRIVATE KEY-----\n",
+  "client_email": "streamlit-ponto@ponto-facial-oseiascarveng.iam.gserviceaccount.com",
+  "client_id": "106424559914355437909",
+  "auth_uri": "https://accounts.google.com/o/oauth2/auth",
+  "token_uri": "https://oauth2.googleapis.com/token",
+  "auth_provider_x509_cert_url": "https://www.googleapis.com/oauth2/v1/certs",
+  "client_x509_cert_url": "https://www.googleapis.com/robot/v1/metadata/x509/streamlit-ponto%40ponto-facial-oseiascarveng.iam.gserviceaccount.com",
+  "universe_domain": "googleapis.com"
+}
