@@ -99,6 +99,9 @@ def exibir_radar():
             # --- CARDS DE INDICADORES (KPIs) ---
             v_total = df_final[col_v_emp].sum()
             
+            # --- CARDS DE INDICADORES (KPIs) ---
+            v_total = df_final[col_v_emp].sum()
+            
             k1, k2, k3 = st.columns(3)
             periodo_label = "no Ano" if mes_sel == "Todos" else f"em {mes_sel}/{ano_sel}"
             
@@ -110,22 +113,23 @@ def exibir_radar():
 
             st.markdown("---")
 
-         if not df_final.empty:
+            # LINHA 84: O 'if' abaixo deve ter o MESMO RECUO que o 'st.markdown' acima
+            if not df_final.empty:
                 # --- GRÁFICOS ---
                 g1, g2 = st.columns(2)
                 with g1:
                     st.write("📈 **Top 10 Origens (Autores/Programas)**")
                     if col_autor:
-                        # AGROUPAMENTO CORRIGIDO: [col_v_emp] fechado corretamente
                         chart_aut = df_final.groupby(col_autor)[col_v_emp].sum().sort_values(ascending=False).head(10)
                         st.bar_chart(chart_aut)
                 
                 with g2:
                     st.write("📍 **Top 10 Destinos (Favorecidos/Cidades)**")
                     if col_dest:
-                        # AGROUPAMENTO CORRIGIDO: [col_v_emp] fechado corretamente
                         chart_dest = df_final.groupby(col_dest)[col_v_emp].sum().sort_values(ascending=False).head(10)
                         st.bar_chart(chart_dest)
 
                 st.write("### 🔍 Detalhamento dos Registros")
                 st.dataframe(df_final, use_container_width=True)
+            else:
+                st.warning(f"Nenhum registro encontrado para os filtros selecionados ({mes_sel}/{ano_sel}).")
