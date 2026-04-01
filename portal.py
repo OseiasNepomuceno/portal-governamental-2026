@@ -35,14 +35,18 @@ def executar():
     # --- LÓGICA DE EXIBIÇÃO DE CONTEÚDO ---
     
     # --- LÓGICA DE NAVEGAÇÃO ---
+   # --- LÓGICA DE NAVEGAÇÃO ---
     if escolha == "📊 Recursos":
-        st.title("📊 Monitoramento de Recursos")
-        st.info("Módulo em integração...")
+        # Chamando o seu arquivo Recursos2026.py (ou o nome que você deu ao arquivo do Radar)
+        try:
+            import radar_emendas_2026 as radar 
+            radar.exibir_radar()
+        except Exception as e:
+            st.error(f"Erro ao carregar o módulo de Recursos: {e}")
 
     elif escolha == "🏛️ Radar de Emendas":
         try:
             import radar_emendas_2026 as radar
-            # Certifique-se que o arquivo radar_emendas_2026.py tem a função exibir_radar()
             radar.exibir_radar() 
         except Exception as e:
             st.error(f"Erro ao carregar módulo: {e}")
