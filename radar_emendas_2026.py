@@ -15,10 +15,8 @@ def carregar_dados_drive(id_secret):
     file_id = st.secrets.get(id_secret)
     if not file_id: 
         return None, f"Chave {id_secret} não configurada."
-    
     url = f'https://drive.google.com/uc?export=download&id={file_id}'
     output = f"{id_secret}.csv"
-    
     try:
         gdown.download(url, output, quiet=True, fuzzy=True)
         try:
@@ -26,7 +24,6 @@ def carregar_dados_drive(id_secret):
             if len(df.columns) < 2: raise ValueError
         except:
             df = pd.read_csv(output, sep=',', encoding='latin1', on_bad_lines='skip', low_memory=False)
-        
         df.columns = [str(c).strip().upper().replace('ï»¿', '').replace('"', '') for c in df.columns]
         return df, "Sucesso"
     except Exception as e:
@@ -34,6 +31,21 @@ def carregar_dados_drive(id_secret):
 
 def formatar_brl(valor):
     return f"R$ {valor:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+
+def limpar_valor_monetario(v):
+    """Transforma 'R$ 1.250,50' em 1250.50 (float)"""
+    v = str(v).upper().replace('R$', '').replace(' ', '').replace('\xa0', '').strip()
+    if not v or v == 'NAN' or v == 'NONE': return 0.0
+    # Se tiver os dois (1.250,50), remove o ponto e troca vírgula por ponto
+    if '.' in v and ',' in v:
+        v = v.replace('.', '').replace(',', '.')
+    # Se tiver apenas vírgula (1250,50), troca por ponto
+    elif ',' in v:
+        v = v.replace(',', '.')
+    try:
+        return float(v)
+    except:
+        return 0.0
 
 def achar(df, termos):
     for col in df.columns:
@@ -61,30 +73,26 @@ def exibir_radar():
     
     if df_base is not None:
         col_v_emp = achar(df_base, ["VALOR", "RECEBIDO"]) or achar(df_base, ["VALOR", "EMPENHADO"]) or achar(df_base, ["VALOR", "REPASSE"])
-        col_v_pag = achar(df_base, ["VALOR", "PAGO"]) or col_v_emp
         col_autor = achar(df_base, ["NOME", "AUTOR"]) or achar(df_base, ["PARLAMENTAR"])
         col_dest  = achar(df_base, ["FAVORECIDO"]) or achar(df_base, ["MUNICÍPIO"])
         col_tempo = achar(df_base, ["ANO", "MÊS"]) or achar(df_base, ["ANO"])
 
-      if col_v_emp:
-            # 1. TRATAMENTO NUMÉRICO REFORÇADO (Limpa R$, pontos e espaços)
-            def limpar_valor(v):
-                v = str(v).upper().replace('R$', '').replace(' ', '').strip()
-                if not v or v == 'NAN': return 0
-                # Se tiver ponto e vírgula (ex: 1.250,50), remove o ponto e troca vírgula por ponto
-                if '.' in v and ',' in v:
-                    v = v.replace('.', '').replace(',', '.')
-                # Se tiver apenas vírgula (ex: 1250,50), troca por ponto
-                elif ',' in v:
-                    v = v.replace(',', '.')
-                try:
-                    return float(v)
-                except:
-                    return 0
+        if col_v_emp:
+            # 1. Tratamento de Valor Usando a Função Blindada
+            df_base[col_v_emp] = df_base[col_v_emp].apply(limpar_valor_monetario)
 
-            # Aplica a limpeza na coluna de valor
-            df_base[col_v_emp] = df_base[col_v_emp].apply(limpar_valor)
-            # 3. Filtragem (Comparação Limpa)
+            # 2. Separação de Ano/Mês
+            if col_tempo:
+                df_base[col_tempo] = df_base[col_tempo].astype(str).str.strip()
+                datas = df_base[col_tempo].str.split('/', expand=True)
+                if datas.shape[1] == 2:
+                    df_base['ANO_REF'] = datas[0].str.strip()
+                    df_base['MES_REF'] = datas[1].str.strip()
+                else:
+                    df_base['ANO_REF'] = df_base[col_tempo]
+                    df_base['MES_REF'] = "Todos"
+
+            # 3. Filtragem
             df_final = df_base
             if 'ANO_REF' in df_base.columns:
                 df_final = df_base[df_base['ANO_REF'] == str(ano_sel).strip()]
@@ -121,7 +129,7 @@ def exibir_radar():
                 st.write("### 🔍 Detalhamento")
                 st.dataframe(df_final, use_container_width=True)
             else:
-                st.warning(f"Nenhum dado encontrado para {mes_sel}/{ano_sel}.")
+                st.warning(f"Nenhum dado financeiro encontrado para {mes_sel}/{ano_sel}.")
         else:
             st.error("Coluna de valor não encontrada.")
     else:
