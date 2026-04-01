@@ -4,17 +4,17 @@ import gdown
 import os
 import importlib
 
-# --- CONFIGURAÇÃO DA PÁGINA (DEVE SER A PRIMEIRA LINHA DE UI) ---
+# --- 1. CONFIGURAÇÃO DA PÁGINA (Sempre a primeira) ---
 st.set_page_config(
     page_title="Core Essence - Portal de Gestão",
     page_icon="🛰️",
     layout="wide"
 )
 
-# --- FUNÇÃO DE LOGIN E PLANOS ---
-def validar_usuario_plano():
+# --- 2. FUNÇÃO DE LOGIN E PLANOS ---
+def autenticar_usuario(usuario_digitado, senha_digitada):
     file_id = st.secrets.get("file_id_licencas")
-    nome_arquivo = "licencas_temp.xlsx"
+    nome_arquivo = "licencas_login.xlsx"
     url = f'https://drive.google.com/uc?id={file_id}'
     
     try:
@@ -22,30 +22,49 @@ def validar_usuario_plano():
             gdown.download(url, nome_arquivo, quiet=True)
         
         df = pd.read_excel(nome_arquivo, sheet_name='usuario')
-        # Buscando dados do Oseias (ajuste conforme seu login real)
-        dados = df[df['usuario'].str.lower() == "oseias"].iloc[0]
         
-        st.session_state['usuario_nome'] = dados['usuario']
-        st.session_state['usuario_plano'] = str(dados['plano']).upper()
-        st.session_state['usuario_status'] = str(dados['status']).lower()
-    except:
-        # Fallback de segurança para não travar o portal
-        st.session_state['usuario_nome'] = "Oseias"
-        st.session_state['usuario_plano'] = "BRONZE"
-        st.session_state['usuario_status'] = "ativo"
+        # Busca o usuário na planilha
+        user_row = df[(df['usuario'].astype(str) == str(usuario_digitado)) & 
+                      (df['senha'].astype(str) == str(senha_digitada))]
+        
+        if not user_row.empty:
+            dados = user_row.iloc[0]
+            if str(dados['status']).lower() == 'ativo':
+                st.session_state['logado'] = True
+                st.session_state['usuario_nome'] = dados['usuario']
+                st.session_state['usuario_plano'] = str(dados['plano']).upper()
+                st.session_state['usuario_status'] = 'ativo'
+                return True
+            else:
+                st.error("⚠️ Esta conta está EXPIRADA. Entre em contato com o suporte.")
+        else:
+            st.error("❌ Usuário ou senha incorretos.")
+    except Exception as e:
+        st.error(f"Erro ao conectar com base de dados: {e}")
+    return False
 
+# --- 3. INTERFACE DE LOGIN ---
+if 'logado' not in st.session_state or not st.session_state['logado']:
+    st.title("🛰️ Core Essence - Login")
+    with st.form("login_form"):
+        u = st.text_input("Usuário")
+        p = st.text_input("Senha", type="password")
+        entrar = st.form_submit_button("Acessar Portal")
+        
+        if entrar:
+            if autenticar_usuario(u, p):
+                st.success("Acesso liberado!")
+                st.rerun()
+    st.stop() # Interrompe aqui para não mostrar o portal sem login
+
+# --- 4. SE CHEGOU AQUI, ESTÁ LOGADO. INICIA O PORTAL ---
 def executar():
-    # Inicializa os dados do plano se necessário
-    if 'usuario_plano' not in st.session_state:
-        validar_usuario_plano()
-
-    # --- BARRA LATERAL ---
     with st.sidebar:
         st.title("Painel de Controle")
         
-        # Tag Visual do Plano
+        # Tag Visual do Plano (Dinâmico conforme a planilha)
         plano = st.session_state.get('usuario_plano', 'BRONZE')
-        st.info(f"🏆 Plano Atual: {plano}")
+        st.info(f"🏆 Plano: {plano}")
         
         st.markdown("---")
         menu_opcoes = ["📊 Recursos", "🏛️ Radar de Emendas", "📜 Revisão de Estatuto", "⚙️ Gestão Administrativa", "🚪 Sair"]
@@ -54,7 +73,7 @@ def executar():
         st.markdown("---")
         st.caption(f"Logado como: {st.session_state.get('usuario_nome')}")
 
-    # --- LÓGICA DE NAVEGAÇÃO (TODOS OS ELIF ALINHADOS) ---
+    # --- NAVEGAÇÃO ---
     if escolha == "📊 Recursos":
         try:
             import recursos2026 as rec
@@ -74,11 +93,8 @@ def executar():
     elif escolha == "📜 Revisão de Estatuto":
         st.title("📜 Revisão de Estatuto Inteligente")
         limite = {"BRONZE": 5, "PRATA": 15, "OURO": 50, "DIAMANTE": 200}.get(plano, 5)
-        st.info(f"Seu plano {plano} permite {limite} revisões.")
-        
-        arquivo = st.file_uploader("Carregar documento (PDF)", type=["pdf"])
-        if arquivo:
-            st.success("Documento carregado! Inicie a análise profissional.")
+        st.info(f"Seu plano {plano} permite {limite} revisões mensais.")
+        st.file_uploader("Carregar documento (PDF)", type=["pdf"])
 
     elif "Gestão" in escolha:
         try:
@@ -89,14 +105,11 @@ def executar():
             st.error(f"Erro no módulo Gestão: {e}")
 
     elif escolha == "🚪 Sair":
+        st.session_state['logado'] = False
         st.cache_data.clear()
         for key in list(st.session_state.keys()):
             del st.session_state[key]
-        st.title("Sessão Encerrada")
-        st.success("Saída efetuada com sucesso.")
-        if st.button("Reiniciar Portal"):
-            st.rerun()
-        st.stop()
+        st.rerun()
 
 if __name__ == "__main__":
     executar()
