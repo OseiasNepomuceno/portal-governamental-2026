@@ -74,11 +74,9 @@ def executar():
         st.caption(f"Usuário: {st.session_state.get('usuario_nome')} | Status: {st.session_state.get('usuario_status').upper()}")
 
     # --- LÓGICA DE NAVEGAÇÃO ---
-    
     if escolha == "📊 Recursos":
         try:
             import recursos2026 as rec
-            # Passamos o plano para o módulo saber o que filtrar
             rec.exibir_radar() 
         except Exception as e:
             st.error(f"Erro ao carregar Recursos: {e}")
@@ -91,25 +89,8 @@ def executar():
             st.error(f"Erro ao carregar módulo: {e}")
 
     elif escolha == "📜 Revisão de Estatuto":
-        # Trava de limite de revisões baseada no Plano
-        limites = {"BRONZE": 5, "PRATA": 15, "OURO": 50, "DIAMANTE": 200}
-        limite_atual = limites.get(plano, 5)
-        
         st.title("📜 Revisor Inteligente")
-        st.info(f"Seu plano **{plano}** permite até **{limite_atual}** revisões profissionais.")
-        
-        # Simulação de contador (você pode salvar isso na sua planilha de LOG_ACESSOS)
-        contador = 0 
-        
-        if contador >= limite_atual:
-            st.error("❌ Limite de revisões atingido! Faça upgrade para o Plano Diamante.")
-            if st.button("🚀 Upgrade para DIAMANTE"):
-                st.write("Redirecionando para consultoria comercial...")
-        else:
-            # Interface do Revisor
-            arquivo_estatuto = st.file_uploader("Carregar Estatuto", type=["pdf"])
-            if arquivo_estatuto:
-                st.success("Análise liberada!")
+        # ... (seu código do revisor aqui) ...
 
     elif "Gestão" in escolha:
         try:
@@ -120,7 +101,15 @@ def executar():
         except Exception as e:
             st.error(f"Erro na Gestão: {e}")
 
- elif escolha == "🚪 Sair":
-        st.session_state.clear()
+    elif escolha == "🚪 Sair":
+        # LIMPEZA TOTAL DA SESSÃO
         st.cache_data.clear()
-        st.rerun()
+        for key in list(st.session_state.keys()):
+            del st.session_state[key]
+        
+        st.title("🚪 Sessão Encerrada")
+        st.success("Você saiu com segurança.")
+        
+        if st.button("Acessar Novamente"):
+            st.rerun()
+        st.stop()
