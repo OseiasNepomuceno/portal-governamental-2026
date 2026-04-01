@@ -97,9 +97,12 @@ def executar():
         else:
             st.warning("Aguardando upload de documento para iniciar a revisão.")
 
+
     elif escolha == "⚙️ Gestão":
-        st.title("⚙️ Gestão Administrativa")
-        st.write("Configurações do sistema.")
+        import gestao as adm
+        adm.exibir_gestao()
+
+    
     elif escolha == "🚪 Sair":
         st.title("🚪 Sessão Encerrada")
         st.success("Você saiu do sistema Core Essence com segurança.")
