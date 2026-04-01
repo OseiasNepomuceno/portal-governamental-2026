@@ -70,4 +70,4 @@ def exibir_gestao():
             st.dataframe(df_usuarios.style.map(color_status, subset=['status']), use_container_width=True)
         except:
             # Caso seu ambiente ainda use uma versão muito antiga, ele tenta o modo padrão
-            st.dataframe(df_usuarios, use_container_width=True)
+           
