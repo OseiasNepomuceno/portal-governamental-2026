@@ -68,32 +68,37 @@ def exibir_radar():
         col_tempo = achar(df_base, ["ANO", "MÊS"]) or achar(df_base, ["ANO"])
 
       if col_v_emp:
-            # 1. Tratamento Numérico
+          # 1. Tratamento Numérico
             df_base[col_v_emp] = df_base[col_v_emp].astype(str).str.replace('.', '', regex=False).str.replace(',', '.', regex=False)
             df_base[col_v_emp] = pd.to_numeric(df_base[col_v_emp], errors='coerce').fillna(0)
 
-            # 2. SEPARAÇÃO DE ANO E MÊS (A Mágica acontece aqui ✨)
+            # 2. SEPARAÇÃO E LIMPEZA DE ANO E MÊS
             if col_tempo:
-                # Transforma '2026/01' em duas colunas reais
-                datas_separadas = df_base[col_tempo].astype(str).str.split('/', expand=True)
+                # Converte para string e limpa espaços extras antes de quebrar a barra
+                df_base[col_tempo] = df_base[col_tempo].astype(str).str.strip()
+                
+                # Divide '2026/01' em duas partes
+                datas_separadas = df_base[col_tempo].str.split('/', expand=True)
+                
                 if datas_separadas.shape[1] == 2:
-                    df_base['ANO_REF'] = datas_separadas[0]
-                    df_base['MES_REF'] = datas_separadas[1]
+                    # .str.strip() remove espaços ocultos que impedem o filtro de funcionar
+                    df_base['ANO_REF'] = datas_separadas[0].str.strip()
+                    df_base['MES_REF'] = datas_separadas[1].str.strip()
                 else:
-                    # Caso a coluna só tenha o ano
-                    df_base['ANO_REF'] = df_base[col_tempo].astype(str)
+                    df_base['ANO_REF'] = df_base[col_tempo]
                     df_base['MES_REF'] = "Todos"
 
-            # 3. FILTRAGEM REFEITA (Agora usando as colunas limpas)
+            # 3. FILTRAGEM (Garantindo que tudo seja comparado como Texto Limpo)
             df_final = df_base
             
-            # Filtra o Ano
+            # Filtro de Ano
             if 'ANO_REF' in df_base.columns:
-                df_final = df_base[df_base['ANO_REF'] == str(ano_sel)]
+                df_final = df_base[df_base['ANO_REF'] == str(ano_sel).strip()]
             
-            # Filtra o Mês (Se não for "Todos")
+            # Filtro de Mês
             if mes_sel != "Todos" and 'MES_REF' in df_base.columns:
-                df_final = df_final[df_final['MES_REF'] == str(mes_sel)]
+                # Aqui comparamos o que o usuário selecionou com a coluna limpa
+                df_final = df_final[df_final['MES_REF'] == str(mes_sel).strip()]
 
             # --- CARDS DE INDICADORES (KPIs) ---
             v_total = df_final[col_v_emp].sum()
