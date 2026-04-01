@@ -98,9 +98,16 @@ def executar():
             st.warning("Aguardando upload de documento para iniciar a revisão.")
 
 
-    elif escolha == "⚙️ Gestão":
-        import gestao as adm
-        adm.exibir_gestao()
+    elif "Gestão" in escolha:  # Usamos 'in' para evitar erros com emojis
+        try:
+            import gestao as adm
+            # Força a atualização do módulo para garantir que o código novo seja lido
+            import importlib
+            importlib.reload(adm)
+            
+            adm.exibir_gestao()
+        except Exception as e:
+            st.error(f"Erro ao carregar o módulo de Gestão: {e}")
 
     
     elif escolha == "🚪 Sair":
