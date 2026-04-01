@@ -10,25 +10,26 @@ def salvar_cadastro_google_sheets(dados_cliente):
     """
     Função para salvar os dados do formulário na aba 'usuario' da planilha
     """
-    # Escopo necessário para acessar o Google Sheets e Drive
+    # Escopos de permissão
     scope = ["https://www.googleapis.com/auth/spreadsheets", "https://www.googleapis.com/auth/drive"]
     
     try:
-        # Carrega as credenciais do seu arquivo JSON
-        # Certifique-se de que o nome do arquivo aqui é EXATAMENTE o que você subiu (ex: 'credentials.json')
-        creds = Credentials.from_service_account_file('seu_arquivo_credencial.json', scopes=scope)
+        # USA O NOME EXATO DO SEU ARQUIVO .JSON
+        nome_da_chave = 'ponto-facial-oseiascarveng-cd7b1ab54295.json'
+        
+        creds = Credentials.from_service_account_file(nome_da_chave, scopes=scope)
         client = gspread.authorize(creds)
         
-        # Abre a planilha pelo nome exato
-        planilha = client.open("ID_LICENÇAS").sheet1 # sheet1 pega a primeira aba
+        # Abre a planilha ID_LICENÇAS
+        # Se a aba de usuários não for a primeira, mude .sheet1 para .worksheet("usuario")
+        planilha = client.open("ID_LICENÇAS").sheet1
         
-        # Adiciona os dados como uma nova linha no final
+        # Adiciona a linha com os dados do novo consultor
         planilha.append_row(dados_cliente)
         return True
     except Exception as e:
-        st.error(f"Erro ao salvar na planilha: {e}")
+        st.error(f"Erro técnico ao acessar a planilha: {e}")
         return False
-
 # --- 1. CONFIGURAÇÃO DA PÁGINA ---
 st.set_page_config(
     page_title="Core Essence - Portal de Gestão",
