@@ -1,142 +1,125 @@
 import streamlit as st
 import pandas as pd
-import gspread
-from datetime import datetime
-from google.oauth2.service_account import Credentials
+import gdown
+import os
 
-# 1. Configuração da Página
-st.set_page_config(page_title="CORE ESSENCE - Portal 2026", layout="wide", page_icon="💎")
+# --- IDs DO DRIVE ---
+FONTES_DADOS = {
+    "Visão Geral (Emendas)": "ID_EMENDAS_GERAL",
+    "Por Favorecido (Quem recebe)": "ID_EMENDAS_FAVORECIDO",
+    "Convênios (Detalhado)": "ID_EMENDAS_CONVENIOS"
+}
 
-# --- BLOCO DE CSS PROFISSIONAL (LIMPEZA TOTAL) ---
-hide_st_style = """
-            <style>
-            #MainMenu {visibility: hidden; display: none !important;}
-            footer {visibility: hidden; display: none !important;}
-            header {visibility: hidden; display: none !important;}
-            [data-testid="stHeader"] {display: none !important;}
-            .stAppDeployButton {display:none !important;}
-            div[class^="viewerBadge"] {display: none !important;}
-            .block-container {padding-top: 2rem !important;}
-            </style>
-            """
-st.markdown(hide_st_style, unsafe_allow_html=True)
-
-# --- FUNÇÃO PARA CONECTAR AO GOOGLE SHEETS (ESCRIÇÃO/LOGS) ---
-def conectar_google_sheets():
-    scope = ["https://www.googleapis.com/auth/spreadsheets"]
-    creds = Credentials.from_service_account_info(st.secrets["gcp_service_account"], scopes=scope)
-    client = gspread.authorize(creds)
-    return client.open_by_key(st.secrets["ID_LICENCAS"])
-
-# --- FUNÇÃO PARA REGISTRAR LOG DE ACESSO ---
-def registrar_log(usuario, acao):
+@st.cache_data(ttl=600, show_spinner=False)
+def carregar_dados_drive(id_secret):
+    file_id = st.secrets.get(id_secret)
+    if not file_id: return None, "Chave não configurada."
+    url = f'https://drive.google.com/uc?export=download&id={file_id}'
+    output = f"{id_secret}.csv"
     try:
-        sh = conectar_google_sheets()
-        wks = sh.worksheet("LOG_ACESSOS")
-        agora = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
-        wks.append_row([agora, usuario, acao])
-    except Exception as e:
-        print(f"Erro ao salvar log: {e}")
-
-# --- FUNÇÃO PARA VERIFICAR LICENÇA (LEITURA) ---
-def verificar_licenca(user_input, pass_input):
-    try:
-        sheet_id = st.secrets["ID_LICENCAS"]
-        url = f"https://docs.google.com/spreadsheets/d/{sheet_id}/export?format=csv"
-        df_licencas = pd.read_csv(url)
-        df_licencas['usuario'] = df_licencas['usuario'].astype(str).str.strip()
-        usuario_db = df_licencas[df_licencas['usuario'] == str(user_input).strip()]
+        gdown.download(url, output, quiet=True, fuzzy=True)
+        try:
+            df = pd.read_csv(output, sep=';', encoding='latin1', on_bad_lines='skip', low_memory=False)
+            if len(df.columns) < 2: raise ValueError
+        except:
+            df = pd.read_csv(output, sep=',', encoding='latin1', on_bad_lines='skip', low_memory=False)
         
-        if not usuario_db.empty:
-            senha_correta = str(usuario_db.iloc[0]['senha']).strip()
-            status = str(usuario_db.iloc[0]['status']).lower().strip()
-            if str(pass_input).strip() == senha_correta and status == "ativo":
-                        # ADICIONE A LINHA ABAIXO AQUI:
-                registrar_log(user_input, "Login realizado com sucesso")
-                return True, "Sucesso"
-            elif status == "expirado":
-                return False, "Licença expirada."
-        return False, "Usuário ou senha incorretos."
+        df.columns = [str(c).strip().upper().replace('ï»¿', '').replace('"', '') for c in df.columns]
+        return df, "Sucesso"
     except Exception as e:
-        return False, f"Erro de conexão: {e}"
+        return None, f"Erro: {e}"
 
-# --- CONTROLE DE SESSÃO ---
-if "logado" not in st.session_state:
-    st.session_state.logado = False
-if "usuario_atual" not in st.session_state:
-    st.session_state.usuario_atual = None
+def formatar_brl(valor):
+    return f"R$ {valor:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
 
-# --- TELA DE LOGIN ---
-if not st.session_state.logado:
-    st.title("🔐 CORE ESSENCE - Gestão de Acessos")
-    with st.form("login_form"):
-        u = st.text_input("Usuário").strip()
-        p = st.text_input("Senha", type="password").strip()
-        if st.form_submit_button("Acessar Portal"):
-            autorizado, mensagem = verificar_licenca(u, p)
-            if autorizado:
-                st.session_state.logado = True
-                st.session_state.usuario_atual = u
-                registrar_log(u, "Login realizado com sucesso")
-                st.rerun()
+def executar():
+    st.set_page_config(page_title="Radar Core Essence", layout="wide")
+    st.title("🏛️ Radar de Emendas Parlamentares")
+    
+    # --- SIDEBAR COM LÓGICA CONDICIONAL ---
+    with st.sidebar:
+        st.header("📍 Filtros de Análise")
+        fonte_sel = st.selectbox("Base de Dados:", list(FONTES_DADOS.keys()))
+        ano_sel = st.selectbox("Ano de Referência", [2026, 2025, 2024], index=0)
+        
+        # O FILTRO DE MÊS SÓ APARECE SE NÃO FOR A VISÃO GERAL
+        mes_sel = "Todos" # Padrão para Visão Geral
+        if fonte_sel != "Visão Geral (Emendas)":
+            meses = ["Todos", "Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", 
+                     "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"]
+            mes_sel = st.selectbox("Mês de Referência", meses)
+        
+        st.write("---")
+        st.info("A Dashboard atualiza automaticamente conforme a base selecionada.")
+
+    id_chave = FONTES_DADOS[fonte_sel]
+    with st.spinner("🛰️ Sincronizando dados..."):
+        df_base, msg = carregar_dados_drive(id_chave)
+    
+    if df_base is not None:
+        # Funções de busca de colunas
+        def achar(termos):
+            for col in df_base.columns:
+                if all(t in col for t in termos): return col
+            return None
+
+        col_v_emp = achar(["VALOR", "EMPENHADO"]) or achar(["VALOR", "REPASSE"]) or achar(["VALOR", "EMENDA"])
+        col_v_pag = achar(["VALOR", "PAGO"])
+        col_autor = achar(["NOME", "AUTOR"]) or achar(["PARLAMENTAR"])
+        col_mun   = achar(["MUNICÍPIO"]) or achar(["MUNICIPIO"])
+        col_ano   = achar(["ANO", "EMENDA"]) or achar(["ANO"])
+        col_mes   = achar(["MES"])
+
+        if col_v_emp:
+            # Limpeza numérica
+            for c in [col_v_emp, col_v_pag]:
+                if c:
+                    df_base[c] = df_base[c].astype(str).str.replace('.', '', regex=False).str.replace(',', '.', regex=False)
+                    df_base[c] = pd.to_numeric(df_base[c], errors='coerce').fillna(0)
+
+            # --- FILTRAGEM ---
+            df_ano = df_base[df_base[col_ano] == ano_sel] if col_ano in df_base.columns else df_base
+            
+            # Filtra por mês apenas se o filtro existir na tela e a coluna existir no CSV
+            df_final = df_ano
+            if fonte_sel != "Visão Geral (Emendas)" and mes_sel != "Todos" and col_mes:
+                df_final = df_ano[df_ano[col_mes] == mes_sel]
+
+            # --- CARDS DE INDICADORES ---
+            st.subheader(f"📊 Dashboard: {fonte_sel}")
+            v_acumulado = df_ano[col_v_emp].sum()
+            v_filtrado_emp = df_final[col_v_emp].sum()
+            v_filtrado_pag = df_final[col_v_pag].sum() if col_v_pag else 0
+
+            c1, c2, c3 = st.columns(3)
+            with c1: st.metric(f"Total Acumulado ({ano_sel})", formatar_brl(v_acumulado))
+            
+            # Se for Visão Geral, o Card 2 e 3 mostram dados do Ano, se for as outras, mostram do Mês
+            label_periodo = "no Ano" if fonte_sel == "Visão Geral (Emendas)" else f"em {mes_sel}"
+            with c2: st.metric(f"Reservado {label_periodo}", formatar_brl(v_filtrado_emp))
+            with c3: st.metric(f"Pago {label_periodo}", formatar_brl(v_filtrado_pag))
+
+            st.markdown("---")
+
+            if not df_final.empty:
+                g1, g2 = st.columns(2)
+                with g1:
+                    st.write("📈 **Ranking de Origem (Autores)**")
+                    if col_autor:
+                        st.bar_chart(df_final.groupby(col_autor)[col_v_emp].sum().sort_values(ascending=False).head(10))
+                with g2:
+                    st.write("📍 **Ranking de Destino (Municípios)**")
+                    if col_mun:
+                        st.bar_chart(df_final.groupby(col_mun)[col_v_emp].sum().sort_values(ascending=False).head(10))
+
+                st.write("### 🔍 Detalhamento dos Dados")
+                st.dataframe(df_final, use_container_width=True)
             else:
-                st.error(mensagem)
-    st.stop()
+                st.warning("Nenhum dado encontrado para os critérios selecionados.")
+        else:
+            st.error(f"Não foi possível identificar colunas de valor nesta base. Colunas: {list(df_base.columns)}")
+    else:
+        st.error(f"Erro ao carregar base: {msg}")
 
-# --- INTERFACE PÓS-LOGIN ---
-st.sidebar.image("logo.png", width=150)
-st.sidebar.title("💎 CORE ESSENCE")
-
-# Definição Dinâmica do Menu
-menu = ["📊 Radar de Recursos 2026", "📈 Radar de Emendas", "📑 Revisor de Estatuto (MROSC)"]
-if st.session_state.usuario_atual == "admin":
-    menu.append("💼 Painel Gestão")
-menu.append("🚪 Sair")
-
-escolha = st.sidebar.radio("Navegação:", menu)
-
-# --- LÓGICA DE NAVEGAÇÃO ---
-
-if escolha == "🚪 Sair":
-    registrar_log(st.session_state.usuario_atual, "Logout realizado")
-    st.session_state.clear()
-    st.rerun()
-
-elif escolha == "💼 Painel Gestão":
-    st.title("💼 Painel Administrativo de Acessos")
-    try:
-        sh = conectar_google_sheets()
-        # Mostra os logs
-        wks_logs = sh.worksheet("LOG_ACESSOS")
-        df_logs = pd.DataFrame(wks_logs.get_all_records())
-        st.subheader("Histórico de Logins")
-        st.dataframe(df_logs.sort_index(ascending=False), use_container_width=True)
-        
-        # Mostra as licenças atuais
-        wks_licencas = sh.worksheet("usuario") # Nome da sua aba de usuários
-        df_lic = pd.DataFrame(wks_licencas.get_all_records())
-        st.subheader("Gerenciamento de Licenças")
-        st.table(df_lic)
-    except Exception as e:
-        st.error(f"Erro ao carregar dados de gestão: {e}")
-
-elif escolha == "📊 Radar de Recursos 2026":
-    try:
-        import recursos2026
-        recursos2026.executar()
-    except Exception as e:
-        st.error(f"Erro ao carregar módulo: {e}")
-
-elif escolha == "📈 Radar de Emendas":
-    try:
-        import radar_emendas_2026
-        radar_emendas_2026.executar()
-    except Exception as e:
-        st.error(f"Erro ao carregar módulo: {e}")
-
-elif escolha == "📑 Revisor de Estatuto (MROSC)":
-    try:
-        import revisor_estatuto
-        revisor_estatuto.executar()
-    except Exception as e:
-        st.error(f"Erro ao carregar módulo: {e}")
+if __name__ == "__main__":
+    executar()
