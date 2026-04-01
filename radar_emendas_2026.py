@@ -66,22 +66,24 @@ def exibir_radar():
         col_dest  = achar(df_base, ["FAVORECIDO"]) or achar(df_base, ["MUNICÍPIO"])
         col_tempo = achar(df_base, ["ANO", "MÊS"]) or achar(df_base, ["ANO"])
 
-        if col_v_emp:
-            # 1. Tratamento Numérico
-            df_base[col_v_emp] = df_base[col_v_emp].astype(str).str.replace('.', '', regex=False).str.replace(',', '.', regex=False)
-            df_base[col_v_emp] = pd.to_numeric(df_base[col_v_emp], errors='coerce').fillna(0)
+      if col_v_emp:
+            # 1. TRATAMENTO NUMÉRICO REFORÇADO (Limpa R$, pontos e espaços)
+            def limpar_valor(v):
+                v = str(v).upper().replace('R$', '').replace(' ', '').strip()
+                if not v or v == 'NAN': return 0
+                # Se tiver ponto e vírgula (ex: 1.250,50), remove o ponto e troca vírgula por ponto
+                if '.' in v and ',' in v:
+                    v = v.replace('.', '').replace(',', '.')
+                # Se tiver apenas vírgula (ex: 1250,50), troca por ponto
+                elif ',' in v:
+                    v = v.replace(',', '.')
+                try:
+                    return float(v)
+                except:
+                    return 0
 
-            # 2. Separação de Ano/Mês (Lógica Anti-Erro)
-            if col_tempo:
-                df_base[col_tempo] = df_base[col_tempo].astype(str).str.strip()
-                datas = df_base[col_tempo].str.split('/', expand=True)
-                if datas.shape[1] == 2:
-                    df_base['ANO_REF'] = datas[0].str.strip()
-                    df_base['MES_REF'] = datas[1].str.strip()
-                else:
-                    df_base['ANO_REF'] = df_base[col_tempo]
-                    df_base['MES_REF'] = "Todos"
-
+            # Aplica a limpeza na coluna de valor
+            df_base[col_v_emp] = df_base[col_v_emp].apply(limpar_valor)
             # 3. Filtragem (Comparação Limpa)
             df_final = df_base
             if 'ANO_REF' in df_base.columns:
