@@ -3,6 +3,31 @@ import pandas as pd
 import gdown
 import os
 import importlib
+import gspread
+from google.oauth2.service_account import Credentials
+
+def salvar_cadastro_google_sheets(dados_cliente):
+    """
+    Função para salvar os dados do formulário na aba 'usuario' da planilha
+    """
+    # Escopo necessário para acessar o Google Sheets e Drive
+    scope = ["https://www.googleapis.com/auth/spreadsheets", "https://www.googleapis.com/auth/drive"]
+    
+    try:
+        # Carrega as credenciais do seu arquivo JSON
+        # Certifique-se de que o nome do arquivo aqui é EXATAMENTE o que você subiu (ex: 'credentials.json')
+        creds = Credentials.from_service_account_file('seu_arquivo_credencial.json', scopes=scope)
+        client = gspread.authorize(creds)
+        
+        # Abre a planilha pelo nome exato
+        planilha = client.open("ID_LICENÇAS").sheet1 # sheet1 pega a primeira aba
+        
+        # Adiciona os dados como uma nova linha no final
+        planilha.append_row(dados_cliente)
+        return True
+    except Exception as e:
+        st.error(f"Erro ao salvar na planilha: {e}")
+        return False
 
 # --- 1. CONFIGURAÇÃO DA PÁGINA ---
 st.set_page_config(
