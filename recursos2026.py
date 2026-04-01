@@ -6,8 +6,7 @@ from reportlab.lib.pagesizes import letter
 from reportlab.pdfgen import canvas
 import datetime
 
-# --- CONFIGURAÇÃO DA PÁGINA ---
-st.set_page_config(page_title="Radar de Recursos | Core Essence", page_icon="🛰️", layout="wide")
+
 
 # --- FUNÇÃO DE BUSCA NA API DO GOVERNO ---
 @st.cache_data(ttl=3600)
@@ -62,18 +61,19 @@ def exibir_radar():
     st.title("🛰️ Radar de Recursos Governamentais")
     st.caption("CORE ESSENCE - Inteligência em Dados Públicos em Tempo Real")
 
-    with st.sidebar:
-        st.header("🔑 Painel do Consultor")
-        st.selectbox("Seu Plano:", ["Start", "Professional", "Enterprise"])
-        
-        st.divider()
-        st.header("📍 Parâmetros de Busca")
-        # Padrão: Presidente Prudente (3541406)
-        ibge = st.text_input("Código IBGE do Município", value="3541406")
-        ano = st.selectbox("Ano", [2026, 2025, 2024], index=0)
-        mes = st.selectbox("Mês", [f"{i:02d}" for i in range(1, 13)], index=0)
-        
-        btn_radar = st.button("Rastrear Agora")
+    # --- PARÂMETROS DE BUSCA NA ÁREA PRINCIPAL (Não na Sidebar) ---
+    st.markdown("### 📍 Parâmetros de Busca")
+    c1, c2, c3 = st.columns([2, 1, 1]) # Cria colunas para os filtros ficarem bonitos
+    
+    with c1:
+        ibge = st.text_input("Código IBGE do Município", value="3541406", key="ibge_input")
+    with c2:
+        ano = st.selectbox("Ano", [2026, 2025, 2024], index=0, key="ano_input")
+    with c3:
+        mes = st.selectbox("Mês", [f"{i:02d}" for i in range(1, 13)], index=0, key="mes_input")
+    
+    # Botão centralizado
+    btn_radar = st.button("🚀 Rastrear Recursos Agora", use_container_width=True)
 
     if btn_radar:
         with st.spinner(f"Consultando base federal de {mes}/{ano}..."):
@@ -82,6 +82,7 @@ def exibir_radar():
             if resultados:
                 df = pd.DataFrame(resultados)
                 
+                # Tratamento de Valores
                 if 'valor' in df.columns:
                     df['valor'] = pd.to_numeric(df['valor'], errors='coerce').fillna(0)
                 
@@ -89,17 +90,18 @@ def exibir_radar():
                 
                 st.success("✅ Dados obtidos com sucesso!")
                 
-                col1, col2 = st.columns(2)
+                # KPIs em destaque
+                k1, k2 = st.columns(2)
                 valor_formatado = f"R$ {total:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
-                col1.metric("Total Identificado", valor_formatado)
-                col2.metric("Nº de Repasses", len(df))
+                k1.metric("Total Identificado", valor_formatado)
+                k2.metric("Nº de Repasses", len(df))
 
+                st.markdown("---")
                 st.subheader("📋 Detalhamento das Transferências")
+                
                 colunas_vistas = ['tipoTransferencia', 'favorecido', 'valor', 'origemRecurso']
                 colunas_finais = [c for c in colunas_vistas if c in df.columns]
                 
                 st.dataframe(df[colunas_finais], use_container_width=True)
             else:
                 st.info(f"Nenhum dado encontrado para {mes}/{ano}. Tente um mês anterior (ex: 12/2025).")
-
-if __name__ == "__main__": exibir_radar()
