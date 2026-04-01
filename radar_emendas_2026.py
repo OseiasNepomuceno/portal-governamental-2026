@@ -89,15 +89,30 @@ def exibir_radar():
             df_base[col_v_emp] = df_base[col_v_emp].apply(limpar_valor_monetario)
 
             # 2. Separação de Ano/Mês
+          # 2. Separação de Ano/Mês (Lógica Reforçada)
             if col_tempo:
+                # Limpa a coluna original
                 df_base[col_tempo] = df_base[col_tempo].astype(str).str.strip()
-                datas = df_base[col_tempo].str.split('/', expand=True)
-                if datas.shape[1] == 2:
-                    df_base['ANO_REF'] = datas[0].str.strip()
-                    df_base['MES_REF'] = datas[1].str.strip()
+                
+                # Tenta extrair o Ano (os primeiros 4 caracteres: '2026')
+                df_base['ANO_REF'] = df_base[col_tempo].str[:4]
+                
+                # Tenta extrair o Mês (os últimos 2 caracteres após a barra: '01')
+                if '/' in df_base[col_tempo].iloc[0]:
+                    df_base['MES_REF'] = df_base[col_tempo].str.split('/').str[-1].str.strip()
                 else:
-                    df_base['ANO_REF'] = df_base[col_tempo]
                     df_base['MES_REF'] = "Todos"
+
+            # 3. Filtragem (Comparação de Texto com Texto)
+            df_final = df_base
+            
+            # Filtro de Ano: Comparamos '2026' (planilha) com '2026' (menu)
+            if 'ANO_REF' in df_base.columns:
+                df_final = df_base[df_base['ANO_REF'] == str(ano_sel)]
+            
+            # Filtro de Mês
+            if mes_sel != "Todos" and 'MES_REF' in df_base.columns:
+                df_final = df_final[df_final['MES_REF'] == str(mes_sel)]
 
             # 3. Filtragem
             df_final = df_base
