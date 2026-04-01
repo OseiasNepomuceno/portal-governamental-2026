@@ -1,4 +1,5 @@
 # "Versão Final Estável - Filtros e Valores OK"
+# Portal rodando OK a partir de 11h40 do dia 01/04/2026
 import streamlit as st
 import pandas as pd
 import gdown
