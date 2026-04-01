@@ -17,7 +17,7 @@ def limpar_valor_monetario(v):
 @st.cache_data(ttl=600)
 def carregar_dados_drive():
     nome_arquivo = "20260320_Convenios.csv"
-    file_id = '13Ekq0dn38mZ99Zz_V5zYmW7og3hS24cN' 
+    file_id = '1UXFvhI3WlYuYidPbbZdojA3jyINmb-L6' 
     url = f'https://drive.google.com/uc?id={file_id}'
     
     try:
