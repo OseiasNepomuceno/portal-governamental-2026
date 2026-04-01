@@ -43,7 +43,7 @@ def achar(df, termos):
 def exibir_radar():
     st.title("🏛️ Radar de Emendas Parlamentares")
     
-    # --- FILTROS ---
+    # --- FILTROS NO TOPO ---
     col_f1, col_f2, col_f3 = st.columns(3)
     with col_f1:
         fonte_sel = st.selectbox("Base de Dados:", list(FONTES_DADOS.keys()))
@@ -59,7 +59,7 @@ def exibir_radar():
     with st.spinner("🛰️ Sincronizando dados CORE ESSENCE..."):
         df_base, msg = carregar_dados_drive(id_chave)
     
-    # --- LINHA 43: O bloco abaixo está RIGOROSAMENTE ALINHADO ---
+    # --- BLOCO DA LINHA 43 - ALINHAMENTO REVISADO ---
     if df_base is not None:
         col_v_emp = achar(df_base, ["VALOR", "RECEBIDO"]) or achar(df_base, ["VALOR", "EMPENHADO"]) or achar(df_base, ["VALOR", "REPASSE"])
         col_v_pag = achar(df_base, ["VALOR", "PAGO"]) or col_v_emp
@@ -85,7 +85,9 @@ def exibir_radar():
             label = "no Ano" if mes_sel == "Todos" else f"em {mes_sel}/{ano_sel}"
             k1.metric(f"Total Identificado {label}", formatar_brl(v_total))
             k2.metric("Qtd. Registros", f"{len(df_final)}")
-            k3.metric("Média/Repasse", formatar_brl(v_total/len(df_final) if len(df_final)>0 else 0))
+            
+            media_val = v_total/len(df_final) if len(df_final)>0 else 0
+            k3.metric("Média/Repasse", formatar_brl(media_val))
 
             st.markdown("---")
 
@@ -94,11 +96,13 @@ def exibir_radar():
                 with g1:
                     if col_autor:
                         st.write("📈 **Top 10 Autores**")
-                        st.bar_chart(df_final.groupby(col_autor)[col_v_emp].sum().sort_values(ascending=False).head(10))
+                        chart_aut = df_final.groupby(col_autor)[col_v_emp].sum().sort_values(ascending=False).head(10)
+                        st.bar_chart(chart_aut)
                 with g2:
                     if col_dest:
                         st.write("📍 **Top 10 Destinos**")
-                        st.bar_chart(df_final.groupby(col_dest)[col_v_emp].sum().sort_values(ascending=False).head(10))
+                        chart_dest = df_final.groupby(col_dest)[col_v_emp].sum().sort_values(ascending=False).head(10)
+                        st.bar_chart(chart_dest)
                 
                 st.write("### 🔍 Detalhamento")
                 st.dataframe(df_final, use_container_width=True)
