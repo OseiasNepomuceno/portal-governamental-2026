@@ -19,7 +19,14 @@ def carregar_dados_drive(id_secret):
     try:
         gdown.download(url, output, quiet=True, fuzzy=True)
         df = pd.read_csv(output, sep=';', encoding='latin1', on_bad_lines='skip', low_memory=False)
+        # Padronização de colunas
         df.columns = [str(c).strip().upper() for c in df.columns]
+        
+        # --- LIMPEZA GLOBAL DE "SEM INFORMAÇÃO" ---
+        # Substitui variações de "Sem Informação" por valor nulo para o pandas ignorar
+        termos_ignorar = ["SEM INFORMAÇÃO", "SEM INFORMACAO", "NÃO INFORMADO", "NAN", "NONE"]
+        df = df.replace(termos_ignorar, pd.NA)
+        
         return df, "Sucesso"
     except Exception as e:
         return None, f"Erro na leitura: {e}"
@@ -75,8 +82,6 @@ def exibir_radar():
         # --- 4. TRAVA DE SEGURANÇA COM TRADUTOR DE UF ---
         if local_liberado and local_liberado != "NAN" and "DIAMANTE" not in plano_user:
             locais = [l.strip().upper() for l in local_liberado.split(',')]
-            
-            # DICIONÁRIO DE TRADUÇÃO PARA GARANTIR O MATCH
             tradutor_uf = {"RJ": "RIO DE JANEIRO", "SP": "SÃO PAULO", "MG": "MINAS GERAIS"}
             
             if "BRONZE" in plano_user:
@@ -86,17 +91,10 @@ def exibir_radar():
             
             elif "PRATA" in plano_user:
                 if C_UF in df_base.columns:
-                    uf_alvo = locais[0] # Ex: RJ
-                    nome_extenso = tradutor_uf.get(uf_alvo, uf_alvo) # Converte RJ para RIO DE JANEIRO
-                    
+                    uf_alvo = locais[0]
+                    nome_extenso = tradutor_uf.get(uf_alvo, uf_alvo)
                     df_base[C_UF] = df_base[C_UF].astype(str).str.upper().str.strip()
-                    # Filtra aceitando tanto a SIGLA quanto o NOME EXTENSO
                     df_base = df_base[(df_base[C_UF] == uf_alvo) | (df_base[C_UF] == nome_extenso)]
-
-            elif "OURO" in plano_user:
-                if C_UF in df_base.columns:
-                    df_base[C_UF] = df_base[C_UF].astype(str).str.upper().str.strip()
-                    df_base = df_base[df_base[C_UF].isin(locais)]
 
         # --- 5. FILTRO DE ANO ---
         if C_ANO in df_base.columns:
@@ -117,12 +115,16 @@ def exibir_radar():
                 with col_g1:
                     if C_AUTOR in df_final.columns:
                         st.write("📈 **Top Autores**")
-                        chart = df_final.groupby(C_AUTOR)[C_VALOR].sum().sort_values(ascending=False).head(10)
+                        # Filtra para não mostrar "Sem Informação" no gráfico
+                        chart_data = df_final.dropna(subset=[C_AUTOR])
+                        chart = chart_data.groupby(C_AUTOR)[C_VALOR].sum().sort_values(ascending=False).head(10)
                         st.bar_chart(chart)
                 with col_g2:
                     if C_MUN in df_final.columns:
                         st.write("📍 **Top Municípios**")
-                        chart_mun = df_final.groupby(C_MUN)[C_VALOR].sum().sort_values(ascending=False).head(10)
+                        # Filtra para não mostrar "Sem Informação" no gráfico
+                        chart_mun_data = df_final.dropna(subset=[C_MUN])
+                        chart_mun = chart_mun_data.groupby(C_MUN)[C_VALOR].sum().sort_values(ascending=False).head(10)
                         st.bar_chart(chart_mun)
 
                 st.dataframe(df_final, use_container_width=True)
