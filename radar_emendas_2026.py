@@ -31,6 +31,8 @@ def carregar_dados_drive(id_secret):
     except Exception as e:
         return None, f"Erro: {e}"
 
+ st.write(df_base.columns)
+
 def formatar_brl(valor):
     return f"R$ {valor:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
 
