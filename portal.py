@@ -101,14 +101,20 @@ def tela_cadastro():
         
         if btn_enviar:
             if nome and email and senha:
-                # Formato para a planilha: Usuario, Senha, Plano, Localidade, Status
                 novo_usuario = [email, senha, plano_final, localidade, "pendente"]
                 if salvar_cadastro_google_sheets(novo_usuario):
-                    st.success("✅ Solicitação enviada! Nossa equipe analisará seu cadastro.")
+                    st.success("✅ Solicitação enviada com sucesso!")
+                    
+                    # 1. Tenta enviar o e-mail em segundo plano
+                    enviar_aviso_email(nome, plano_final, email)
+                    
+                    # 2. Mostra o botão para o cliente te avisar no Zap (Garante que você veja na hora!)
+                    link_zap = gerar_link_whatsapp(nome, plano_final)
+                    st.info("Para agilizar sua liberação, clique no botão abaixo:")
+                    st.link_button("📱 AVISAR NO WHATSAPP", link_zap)
+                    
                 else:
-                    st.error("Erro técnico ao salvar. Tente novamente.")
-            else:
-                st.error("Preencha Nome, E-mail e Senha para prosseguir.")
+                    st.error("Erro técnico ao salvar.")
 
 # --- 4. NAVEGAÇÃO E LÓGICA PRINCIPAL ---
 def executar():
