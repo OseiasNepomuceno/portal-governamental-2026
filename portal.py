@@ -205,7 +205,7 @@ def executar():
         elif st.session_state['tela'] == 'cadastro':
             tela_cadastro()
 
-   else:
+    else:
         # --- PORTAL APÓS LOGIN ---
         with st.sidebar:
             st.title("Core Essence")
