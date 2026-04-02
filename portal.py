@@ -51,61 +51,61 @@ st.set_page_config(page_title="Core Essence", page_icon="🛰️", layout="wide"
 # --- 3. TELAS DO SISTEMA ---
 def tela_cadastro():
     st.title("🚀 Cadastro de Novo Consultor")
-    st.write("Preencha os dados abaixo para solicitar seu acesso ao Radar.")
+    st.write("Escolha seu plano e preencha os dados para solicitar seu acesso.")
     
     if st.button("⬅️ Voltar para o Início", key="btn_voltar_home_cad"):
         st.session_state['tela'] = 'home'
         st.rerun()
 
-    # Criamos o formulário
-    with st.form("form_cadastro_novo"):
+    # --- 1. SELEÇÃO DE PLANO (FORA DO FORMULÁRIO PARA SER INSTANTÂNEO) ---
+    opcoes_planos = {
+        "BRONZE: Acesso a até 03 Municípios + 05 Revisões": "BRONZE",
+        "PRATA: Acesso a 01 Estado completo + 15 Revisões": "PRATA",
+        "OURO: Acesso a 03 Estados completos + 50 Revisões": "OURO",
+        "DIAMANTE: Acesso Nacional (Brasil) + 200 Revisões": "DIAMANTE"
+    }
+    
+    # O usuário vê a descrição, mas o código guarda apenas o nome do plano (BRONZE, PRATA...)
+    escolha_visual = st.selectbox("Selecione o Plano Desejado:", list(opcoes_planos.keys()))
+    plano_final = opcoes_planos[escolha_visual]
+
+    # --- 2. LÓGICA DINÂMICA DE LABELS ---
+    if plano_final == "BRONZE":
+        label_local = "📍 Liste as 03 Cidades de Interesse"
+        placeholder_local = "Ex: Presidente Prudente, Álvares Machado..."
+    elif plano_final == "PRATA":
+        label_local = "📍 Digite o Estado (UF) de Interesse"
+        placeholder_local = "Ex: São Paulo ou RJ"
+    elif plano_final == "OURO":
+        label_local = "📍 Liste os 03 Estados (UF) de Interesse"
+        placeholder_local = "Ex: SP, RJ, MG"
+    else:
+        label_local = "📍 Localidade (Acesso Nacional Liberado)"
+        placeholder_local = "Digite BRASIL ou deixe em branco"
+
+    # --- 3. FORMULÁRIO DE DADOS PESSOAIS ---
+    with st.form("form_dados_pessoais"):
         nome = st.text_input("Nome Completo")
-        email = st.text_input("E-mail (Será seu usuário)")
+        email = st.text_input("E-mail (Seu futuro usuário)")
         senha = st.text_input("Crie uma Senha", type="password")
         
-        # 1. Seleção de Plano
-        plano_selecionado = st.selectbox(
-            "Escolha seu Plano", 
-            ["BRONZE", "PRATA", "OURO", "DIAMANTE"],
-            key="escolha_plano_form"
-        )
-        
-        # 2. LÓGICA DINÂMICA DE MENSAGENS E CAMPOS
-        if plano_selecionado == "BRONZE":
-            st.info("📦 **Plano BRONZE:** Acesso a até **03 Municípios** específicos + 05 Revisões de Estatuto/mês.")
-            label_local = "Liste as 03 Cidades de Interesse"
-            placeholder_local = "Ex: Presidente Prudente, Álvares Machado, Pirapozinho"
-            
-        elif plano_selecionado == "PRATA":
-            st.info("🥈 **Plano PRATA:** Acesso a **01 Estado completo** + 15 Revisões de Estatuto/mês.")
-            label_local = "Digite o Estado (UF) de Interesse"
-            placeholder_local = "Ex: SP ou Rio de Janeiro"
-            
-        elif plano_selecionado == "OURO":
-            st.info("🥇 **Plano OURO:** Acesso a **03 Estados completos** + 50 Revisões de Estatuto/mês.")
-            label_local = "Liste os 03 Estados (UF) de Interesse"
-            placeholder_local = "Ex: SP, RJ, MG"
-            
-        else:  # DIAMANTE
-            st.info("💎 **Plano DIAMANTE:** Acesso **Nacional (Todos os Estados)** + 200 Revisões de Estatuto/mês.")
-            label_local = "Localidade (Acesso Nacional Liberado)"
-            placeholder_local = "Pode deixar em branco ou digitar BRASIL"
-
-        # 3. CAMPO DE LOCALIDADE DINÂMICO
+        # O campo de localidade agora usa a label dinâmica definida acima
         localidade = st.text_input(label_local, placeholder=placeholder_local)
         
-        btn_enviar = st.form_submit_button("FINALIZAR CADASTRO")
+        st.warning(f"⚠️ Você está contratando o plano: **{plano_final}**")
+        
+        btn_enviar = st.form_submit_button("FINALIZAR CADASTRO E SOLICITAR ACESSO")
         
         if btn_enviar:
             if nome and email and senha:
                 # Formato para a planilha: Usuario, Senha, Plano, Localidade, Status
-                novo_usuario = [email, senha, plano_selecionado, localidade, "pendente"]
+                novo_usuario = [email, senha, plano_final, localidade, "pendente"]
                 if salvar_cadastro_google_sheets(novo_usuario):
-                    st.success("✅ Cadastro enviado com sucesso! Aguarde a liberação administrativa.")
+                    st.success("✅ Solicitação enviada! Nossa equipe analisará seu cadastro.")
                 else:
-                    st.error("Erro ao salvar cadastro. Verifique sua conexão.")
+                    st.error("Erro técnico ao salvar. Tente novamente.")
             else:
-                st.warning("Por favor, preencha todos os campos obrigatórios.")
+                st.error("Preencha Nome, E-mail e Senha para prosseguir.")
 
 # --- 4. NAVEGAÇÃO E LÓGICA PRINCIPAL ---
 def executar():
