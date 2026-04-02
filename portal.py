@@ -37,7 +37,7 @@ st.set_page_config(
     layout="wide"
 )
 
-# --- 2. FUNÇÃO DE LOGIN ---
+# --- 2. FUNÇÃO DE LOGIN ATUALIZADA ---
 def autenticar_usuario(usuario_digitado, senha_digitada):
     file_id = st.secrets.get("file_id_licencas")
     nome_arquivo = "licencas_login.xlsx"
@@ -50,18 +50,29 @@ def autenticar_usuario(usuario_digitado, senha_digitada):
         
         df = pd.read_excel(nome_arquivo, sheet_name='usuario')
         
-        user_row = df[(df['usuario'].astype(str).str.strip() == str(usuario_digitado).strip()) & 
-                      (df['senha'].astype(str).str.strip() == str(senha_digitada).strip())]
+        # Limpeza básica para evitar erros de espaços em branco
+        df['usuario'] = df['usuario'].astype(str).str.strip()
+        df['senha'] = df['senha'].astype(str).str.strip()
+
+        user_row = df[(df['usuario'] == str(usuario_digitado).strip()) & 
+                      (df['senha'] == str(senha_digitada).strip())]
         
         if not user_row.empty:
+            # Pega a linha inteira do usuário
             dados = user_row.iloc[0]
-            plano_bruto = dados.get('PLANO', dados.get('plano', 'BRONZE'))
+            
             status_bruto = dados.get('STATUS', dados.get('status', 'ativo'))
 
             if str(status_bruto).lower().strip() == 'ativo':
+                # --- AQUI ESTÁ A ALTERAÇÃO CRUCIAL ---
+                # Salvamos a linha inteira (incluindo a nova coluna local_liberado)
+                st.session_state['usuario_logado'] = dados.to_dict() 
+                
+                # Mantemos as variáveis antigas para não quebrar outras partes do código
                 st.session_state['logado'] = True
                 st.session_state['usuario_nome'] = dados.get('usuario', 'Consultor')
-                st.session_state['usuario_plano'] = str(plano_bruto).upper().strip()
+                st.session_state['usuario_plano'] = str(dados.get('PLANO', 'BRONZE')).upper().strip()
+                
                 return True
             else:
                 st.error("⚠️ Esta conta está EXPIRADA.")
