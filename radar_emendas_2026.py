@@ -93,10 +93,18 @@ def exibir_radar():
                     df_base = df_base[df_base[col_mun].astype(str).str.upper().isin(cidades)]
                     st.sidebar.warning(f"📍 Cidades liberadas: {len(cidades)}")
             
-            elif "PRATA" in plano_user:
+           elif "PRATA" in plano_user:
+                # 1. Filtro por Estado (UF)
                 if col_uf in df_base.columns:
-                    df_base = df_base[df_base[col_uf].astype(str).str.upper() == local_liberado]
-                    st.sidebar.info(f"📍 Estado liberado: {local_liberado}")
+                    # Garantimos que compare 'SP' com 'SP' sem espaços e em maiúsculo
+                    estado_alvo = str(local_liberado).strip().upper()
+                    df_base = df_base[df_base[col_uf].astype(str).str.upper().str.strip() == estado_alvo]
+                    st.sidebar.info(f"📍 Estado liberado: {estado_alvo}")
+                
+                # 2. Se for 'Visão Geral', o Prata TEM que ver os dados do Estado
+                # Se cair aqui e df_base estiver vazio, avisamos o usuário
+                if df_base.empty:
+                    st.sidebar.warning(f"⚠️ Sem dados para a UF: {local_liberado}")
 
             elif "OURO" in plano_user:
                 estados = [e.strip() for e in local_liberado.split(',')]
