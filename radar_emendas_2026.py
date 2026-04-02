@@ -39,12 +39,12 @@ def limpar_valor_monetario(v):
 def exibir_radar():
     st.title("🏛️ Radar de Emendas Parlamentares")
     
-    # --- 1. RECUPERAÇÃO DE DADOS DO USUÁRIO ---
+    # --- 1. RECUPERAÇÃO DE DADOS ---
     plano_user = str(st.session_state.get('usuario_plano', 'BRONZE')).upper()
     usuario_info = st.session_state.get('usuario_logado', {})
     local_liberado = str(usuario_info.get('local_liberado', '')).upper().strip()
 
-    # --- 2. PAINEL INFORMATIVO NO MENU LATERAL ---
+    # --- 2. MENU LATERAL ---
     with st.sidebar:
         st.markdown("---")
         st.markdown(f"**Nível de Acesso:** `{plano_user}`")
@@ -53,7 +53,7 @@ def exibir_radar():
             st.info(f"📍 **{label_local} Liberado:**\n{local_liberado}")
         st.markdown("---")
 
-    # --- 3. FILTROS DE INTERFACE ---
+    # --- 3. FILTROS ---
     col_f1, col_f2, col_f3 = st.columns(3)
     with col_f1:
         fonte_sel = st.selectbox("Base de Dados:", list(FONTES_DADOS.keys()))
@@ -73,7 +73,7 @@ def exibir_radar():
         C_VALOR = "VALOR EMPENHADO"
         C_AUTOR = "NOME DO AUTOR DA EMENDA"
 
-        # --- 4. TRAVA DE SEGURANÇA (COM SUPER LIMPEZA DE ESPAÇOS) ---
+        # --- 4. TRAVA DE SEGURANÇA E DIAGNÓSTICO ---
         if local_liberado and local_liberado != "NAN" and "DIAMANTE" not in plano_user:
             locais = [l.strip().upper() for l in local_liberado.split(',')]
             
@@ -82,11 +82,11 @@ def exibir_radar():
                     df_base[C_MUN] = df_base[C_MUN].astype(str).str.upper().str.strip()
                     df_base = df_base[df_base[C_MUN].isin(locais)]
             
-          elif "PRATA" in plano_user:
+            elif "PRATA" in plano_user:
                 if C_UF in df_base.columns:
-                    # Mostra os 5 primeiros estados que o Python está lendo
-                    estados_na_planilha = df_base[C_UF].unique()[:5]
-                    st.sidebar.warning(f"Estados lidos: {estados_na_planilha}")
+                    # DIAGNÓSTICO TEMPORÁRIO (O PULO DO GATO)
+                    amostra_estados = df_base[C_UF].unique()[:5]
+                    st.sidebar.warning(f"🔎 Lendo na Planilha: {amostra_estados}")
                     
                     uf_alvo = locais[0] 
                     df_base[C_UF] = df_base[C_UF].astype(str).str.upper().str.strip()
@@ -104,7 +104,7 @@ def exibir_radar():
         else:
             df_final = df_base
 
-        # --- 6. EXIBIÇÃO DOS GRÁFICOS E TABELA ---
+        # --- 6. EXIBIÇÃO ---
         if C_VALOR in df_final.columns:
             df_final[C_VALOR] = df_final[C_VALOR].apply(limpar_valor_monetario)
             
