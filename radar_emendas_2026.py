@@ -18,7 +18,6 @@ def carregar_dados_drive(id_secret):
     output = f"{id_secret}.csv"
     try:
         gdown.download(url, output, quiet=True, fuzzy=True)
-        # Separador ';' conforme seu Bloco de Notas
         df = pd.read_csv(output, sep=';', encoding='latin1', on_bad_lines='skip', low_memory=False)
         df.columns = [str(c).strip().upper() for c in df.columns]
         return df, "Sucesso"
@@ -73,9 +72,12 @@ def exibir_radar():
         C_VALOR = "VALOR EMPENHADO"
         C_AUTOR = "NOME DO AUTOR DA EMENDA"
 
-        # --- 4. TRAVA DE SEGURANÇA E DIAGNÓSTICO ---
+        # --- 4. TRAVA DE SEGURANÇA COM TRADUTOR DE UF ---
         if local_liberado and local_liberado != "NAN" and "DIAMANTE" not in plano_user:
             locais = [l.strip().upper() for l in local_liberado.split(',')]
+            
+            # DICIONÁRIO DE TRADUÇÃO PARA GARANTIR O MATCH
+            tradutor_uf = {"RJ": "RIO DE JANEIRO", "SP": "SÃO PAULO", "MG": "MINAS GERAIS"}
             
             if "BRONZE" in plano_user:
                 if C_MUN in df_base.columns:
@@ -84,13 +86,12 @@ def exibir_radar():
             
             elif "PRATA" in plano_user:
                 if C_UF in df_base.columns:
-                    # DIAGNÓSTICO TEMPORÁRIO (O PULO DO GATO)
-                    amostra_estados = df_base[C_UF].unique()[:5]
-                    st.sidebar.warning(f"🔎 Lendo na Planilha: {amostra_estados}")
+                    uf_alvo = locais[0] # Ex: RJ
+                    nome_extenso = tradutor_uf.get(uf_alvo, uf_alvo) # Converte RJ para RIO DE JANEIRO
                     
-                    uf_alvo = locais[0] 
                     df_base[C_UF] = df_base[C_UF].astype(str).str.upper().str.strip()
-                    df_base = df_base[df_base[C_UF] == uf_alvo]
+                    # Filtra aceitando tanto a SIGLA quanto o NOME EXTENSO
+                    df_base = df_base[(df_base[C_UF] == uf_alvo) | (df_base[C_UF] == nome_extenso)]
 
             elif "OURO" in plano_user:
                 if C_UF in df_base.columns:
@@ -99,7 +100,7 @@ def exibir_radar():
 
         # --- 5. FILTRO DE ANO ---
         if C_ANO in df_base.columns:
-            df_base[C_ANO] = df_base[C_ANO].astype(str).str.strip()
+            df_base[C_ANO] = df_base[C_ANO].astype(str).str.strip().str.replace('.0', '', regex=False)
             df_final = df_base[df_base[C_ANO] == str(ano_sel)]
         else:
             df_final = df_base
