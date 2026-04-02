@@ -123,18 +123,36 @@ def executar():
             menu.append("🚪 Sair")
             escolha = st.radio("Módulos:", menu)
 
+        # --- REDIRECIONAMENTO DE MÓDULOS ---
         if escolha == "📊 Recursos":
             import recursos2026 as rec
             importlib.reload(rec)
             rec.exibir_radar()
+
         elif escolha == "🏛️ Radar de Emendas":
             import radar_emendas_2026 as radar
             importlib.reload(radar)
             radar.exibir_radar()
+
+        # ESTE BLOCO ABAIXO DEVE ESTAR NO MESMO ALINHAMENTO DOS ANTERIORES
+        elif escolha == "📜 Revisão de Estatuto":
+            st.title("📜 Revisão de Estatuto")
+            # Define o limite baseado no plano (Bronze ganha 5 revisões)
+            limite = {"BRONZE": 5, "PRATA": 15, "OURO": 50, "DIAMANTE": 200}.get(plano, 5)
+            st.info(f"Seu plano **{plano}** permite {limite} revisões mensais.")
+            
+            st.write("---")
+            st.subheader("Análise de Conformidade")
+            arquivo = st.file_uploader("Arraste o arquivo do Estatuto (PDF)", type=["pdf"])
+            if arquivo:
+                st.success("Arquivo recebido! Iniciando pré-análise...")
+                # Aqui entrará a integração com a IA de revisão futuramente
+
         elif escolha == "⚙️ Gestão Administrativa":
             import gestao as adm
             importlib.reload(adm)
             adm.exibir_gestao()
+
         elif escolha == "🚪 Sair":
             st.session_state.clear()
             st.rerun()
