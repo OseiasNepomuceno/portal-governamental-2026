@@ -48,31 +48,38 @@ def autenticar_usuario(usuario_digitado, senha_digitada):
 # --- CONFIGURAÇÃO DA PÁGINA ---
 st.set_page_config(page_title="Core Essence", page_icon="🛰️", layout="wide")
 
-# --- NAVEGAÇÃO ---
-# Fluxo de Telas (Login / Cadastro / Home)
+# --- TELAS ADICIONAIS ---
+def tela_cadastro():
+    st.title("🚀 Cadastro de Novo Consultor")
+    if st.button("⬅️ Voltar"):
+        st.session_state['tela'] = 'home'
+        st.rerun()
+    st.info("Área de cadastro em desenvolvimento para integração com pagamento.")
+
+# --- NAVEGAÇÃO PRINCIPAL ---
+def executar():
+    if 'logado' not in st.session_state:
+        st.session_state['logado'] = False
+    if 'tela' not in st.session_state:
+        st.session_state['tela'] = 'home'
+
     if not st.session_state['logado']:
         if st.session_state['tela'] == 'home':
             # --- HEADER DE IMPACTO ---
             st.markdown("<h1 style='text-align: center;'>🛰️ Core Essence</h1>", unsafe_allow_html=True)
             st.markdown("<h3 style='text-align: center; color: #555;'>Inteligência Governamental Estratégica</h3>", unsafe_allow_html=True)
+            st.write("\n")
             
-            st.write("\n") # Espaçamento
-            
-            # --- AS 3 FRASES DE IMPACTO EM CARDS ---
+            # --- AS 3 FRASES DE IMPACTO ---
             c_f1, c_f2, c_f3 = st.columns(3)
-            
             with c_f1:
                 st.info("**Para nossos Consultores:**\n\n*Bem-vindo de volta ao centro da estratégia. Sua inteligência de dados está sincronizada e pronta para novas oportunidades.*")
-            
             with c_f2:
                 st.success("**Para novos Membros:**\n\n*Você está a um passo de transformar dados governamentais em faturamento real. O acesso ao maior radar de recursos do país começa aqui.*")
-            
             with c_f3:
                 st.warning("**Por que ser Core Essence?**\n\n*Não apenas monitore, antecipe-se. No jogo do setor público, a Core Essence é a diferença entre quem busca informações e quem domina resultados.*")
 
             st.markdown("---")
-            
-            # --- BOTÕES DE ACESSO ---
             col_b1, col_b2 = st.columns(2)
             with col_b1:
                 if st.button("👤 JÁ SOU CONSULTOR (LOGIN)", use_container_width=True, type="primary"):
@@ -82,8 +89,8 @@ st.set_page_config(page_title="Core Essence", page_icon="🛰️", layout="wide"
                 if st.button("🚀 QUERO ME CADASTRAR AGORA", use_container_width=True):
                     st.session_state['tela'] = 'cadastro'
                     st.rerun()
-            
             st.markdown("<p style='text-align: center; font-size: 0.8rem; color: gray;'>© 2026 Core Essence - Todos os direitos reservados.</p>", unsafe_allow_html=True)
+
         elif st.session_state['tela'] == 'login':
             st.title("🔑 Acesso ao Portal")
             if st.button("⬅️ Voltar"):
@@ -98,6 +105,9 @@ st.set_page_config(page_title="Core Essence", page_icon="🛰️", layout="wide"
                     else:
                         st.error("Usuário ou senha incorretos.")
 
+        elif st.session_state['tela'] == 'cadastro':
+            tela_cadastro()
+
     else:
         # --- PORTAL APÓS LOGIN ---
         with st.sidebar:
@@ -105,15 +115,11 @@ st.set_page_config(page_title="Core Essence", page_icon="🛰️", layout="wide"
             plano = st.session_state.get('usuario_plano', 'BRONZE')
             user_raw = st.session_state.get('usuario_nome', 'Consultor')
             user_comparar = str(user_raw).lower().strip()
-            
             st.info(f"🏆 Plano: {plano}")
 
             menu = ["📊 Recursos", "🏛️ Radar de Emendas", "📜 Revisão de Estatuto"]
-            
-            # TRAVA DE ADMIN
             if user_comparar == "admin":
                 menu.append("⚙️ Gestão Administrativa")
-            
             menu.append("🚪 Sair")
             escolha = st.radio("Módulos:", menu)
 
