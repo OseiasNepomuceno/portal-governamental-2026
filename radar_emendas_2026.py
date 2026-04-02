@@ -82,8 +82,12 @@ def exibir_radar():
                     df_base[C_MUN] = df_base[C_MUN].astype(str).str.upper().str.strip()
                     df_base = df_base[df_base[C_MUN].isin(locais)]
             
-            elif "PRATA" in plano_user:
+          elif "PRATA" in plano_user:
                 if C_UF in df_base.columns:
+                    # Mostra os 5 primeiros estados que o Python está lendo
+                    estados_na_planilha = df_base[C_UF].unique()[:5]
+                    st.sidebar.warning(f"Estados lidos: {estados_na_planilha}")
+                    
                     uf_alvo = locais[0] 
                     df_base[C_UF] = df_base[C_UF].astype(str).str.upper().str.strip()
                     df_base = df_base[df_base[C_UF] == uf_alvo]
