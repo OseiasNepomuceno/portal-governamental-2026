@@ -205,46 +205,57 @@ def executar():
         elif st.session_state['tela'] == 'cadastro':
             tela_cadastro()
 
-    else:
+   else:
         # --- PORTAL APÓS LOGIN ---
         with st.sidebar:
             st.title("Core Essence")
+            
+            # Captura os dados da sessão atual
             plano = st.session_state.get('usuario_plano', 'BRONZE')
+            usuario_nome_raw = st.session_state.get('usuario_nome', 'Consultor')
+            
+            # Normaliza o nome para comparação (remove espaços e deixa minúsculo)
+            usuario_comparar = str(usuario_nome_raw).lower().strip()
+            
             st.info(f"🏆 Plano: {plano}")
-            menu = ["📊 Recursos", "🏛️ Radar de Emendas", "📜 Revisão de Estatuto", "⚙️ Gestão Administrativa", "🚪 Sair"]
-            escolha = st.radio("Módulos:", menu)
-            st.caption(f"Usuário: {st.session_state.get('usuario_nome')}")
 
+            # 1. Menu Base para todos os níveis (Bronze, Prata, Ouro, Diamante)
+            menu = ["📊 Recursos", "🏛️ Radar de Emendas", "📜 Revisão de Estatuto"]
+            
+            # 2. TRAVA DE ELITE: Só adiciona se o LOGIN for exatamente 'admin'
+            # Note que aqui não checamos o plano, apenas o seu nome de acesso.
+            if usuario_comparar == "admin":
+                menu.append("⚙️ Gestão Administrativa")
+            
+            menu.append("🚪 Sair")
+            
+            # 3. Renderiza o menu na barra lateral
+            escolha = st.radio("Módulos:", menu)
+            st.caption(f"Logado como: {usuario_nome_raw}")
+
+        # --- REDIRECIONAMENTO DE MÓDULOS ---
         if escolha == "📊 Recursos":
-            try:
-                import recursos2026 as rec
-                importlib.reload(rec)
-                rec.exibir_radar()
-            except Exception as e: st.error(f"Erro: {e}")
+            import recursos2026 as rec
+            importlib.reload(rec)
+            rec.exibir_radar()
 
         elif escolha == "🏛️ Radar de Emendas":
-            try:
-                import radar_emendas_2026 as radar
-                importlib.reload(radar)
-                radar.exibir_radar()
-            except Exception as e: st.error(f"Erro: {e}")
+            import radar_emenda_2026 as radar
+            importlib.reload(radar)
+            radar.exibir_radar()
 
         elif escolha == "📜 Revisão de Estatuto":
             st.title("📜 Revisão de Estatuto")
+            # Logica de limite por plano mantida
             limite = {"BRONZE": 5, "PRATA": 15, "OURO": 50, "DIAMANTE": 200}.get(plano, 5)
-            st.info(f"Limite: {limite} revisões.")
-            st.file_uploader("Upload PDF", type=["pdf"])
+            st.info(f"Seu plano permite {limite} revisões/mês.")
+            st.file_uploader("Upload do arquivo PDF", type=["pdf"])
 
-        elif "Gestão" in escolha:
-            try:
-                import gestao as adm
-                importlib.reload(adm)
-                adm.exibir_gestao()
-            except Exception as e: st.error(f"Erro: {e}")
+        elif escolha == "⚙️ Gestão Administrativa":
+            import gestao as adm
+            importlib.reload(adm)
+            adm.exibir_gestao()
 
         elif escolha == "🚪 Sair":
             st.session_state.clear()
             st.rerun()
-
-if __name__ == "__main__":
-    executar()
