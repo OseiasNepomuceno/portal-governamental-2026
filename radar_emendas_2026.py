@@ -1,10 +1,10 @@
-# "Versão Final Estável - Filtros de Segurança Integrados"
 import streamlit as st
 import pandas as pd
 import gdown
 import os
+import importlib
 
-# --- CONFIGURAÇÕES DE DADOS (AJUSTADO: REMOVIDO CONVÊNIOS) ---
+# --- CONFIGURAÇÕES DE DADOS ---
 FONTES_DADOS = {
     "Visão Geral (Emendas)": "ID_EMENDAS_GERAL",
     "Por Favorecido (Quem recebe)": "ID_EMENDAS_FAVORECIDO"
@@ -25,13 +25,10 @@ def carregar_dados_drive(id_secret):
         except:
             df = pd.read_csv(output, sep=',', encoding='latin1', on_bad_lines='skip', low_memory=False)
         
-        # Padronização de colunas
         df.columns = [str(c).strip().upper().replace('ï»¿', '').replace('"', '') for c in df.columns]
         return df, "Sucesso"
     except Exception as e:
         return None, f"Erro: {e}"
-
- st.write(df_base.columns)
 
 def formatar_brl(valor):
     return f"R$ {valor:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
@@ -59,17 +56,14 @@ def achar(df, termos):
 def exibir_radar():
     st.title("🏛️ Radar de Emendas Parlamentares")
     
-    # --- 1. IDENTIFICAÇÃO DO USUÁRIO E PLANO ---
     usuario = st.session_state.get('usuario_logado')
     plano_user = str(st.session_state.get('usuario_plano', 'BRONZE')).upper()
     local_liberado = ""
     if usuario and 'local_liberado' in usuario:
         local_liberado = str(usuario['local_liberado']).upper()
 
-    # --- FILTROS NO TOPO ---
     col_f1, col_f2, col_f3 = st.columns(3)
     with col_f1:
-        # Aqui o selectbox usará o dicionário já sem a opção de Convênios
         fonte_sel = st.selectbox("Base de Dados:", list(FONTES_DADOS.keys()))
     with col_f2:
         ano_sel = st.selectbox("Ano de Referência", [2026, 2025, 2024], index=0)
@@ -84,34 +78,28 @@ def exibir_radar():
         df_base, msg = carregar_dados_drive(id_chave)
     
     if df_base is not None:
-       # --- 2. APLICAÇÃO DA TRAVA DE SEGURANÇA (CORRIGIDO) ---
+        # --- TRAVA DE SEGURANÇA ---
         col_uf = achar(df_base, ["UF"]) or "UF"
         col_mun = achar(df_base, ["MUNICÍPIO"]) or achar(df_base, ["CIDADE"]) or "NOME MUNICÍPIO"
 
         if local_liberado and local_liberado != "NAN" and "DIAMANTE" not in plano_user:
-            # Normaliza os locais (remove espaços e deixa em maiúsculo)
             locais_permitidos = [loc.strip().upper() for loc in local_liberado.split(',')]
             
             if "BRONZE" in plano_user:
                 if col_mun in df_base.columns:
                     df_base = df_base[df_base[col_mun].astype(str).str.upper().isin(locais_permitidos)]
-                    st.sidebar.warning(f"📍 Cidades liberadas: {len(locais_permitidos)}")
             
             elif "PRATA" in plano_user:
-                # O Prata libera o Estado inteiro (UF)
                 if col_uf in df_base.columns:
-                    estado_alvo = locais_permitidos[0] # Pega a primeira UF da lista (ex: SP)
-                    df_base = df_base[df_base[col_uf].astype(str).str.upper().str.strip() == estado_alvo]
-                    st.sidebar.info(f"📍 Estado liberado: {estado_alvo}")
-                else:
-                    st.sidebar.error("⚠️ Coluna UF não encontrada para o Plano Prata.")
+                    uf_alvo = locais_permitidos[0]
+                    df_base = df_base[df_base[col_uf].astype(str).str.upper().str.strip() == uf_alvo]
+                    st.sidebar.info(f"📍 Estado liberado: {uf_alvo}")
 
             elif "OURO" in plano_user:
                 if col_uf in df_base.columns:
                     df_base = df_base[df_base[col_uf].astype(str).str.upper().isin(locais_permitidos)]
-                    st.sidebar.info(f"📍 Estados liberados: {len(locais_permitidos)}")
 
-        # --- PROCESSAMENTO DOS DADOS FILTRADOS ---
+        # --- PROCESSAMENTO ---
         col_v_emp = achar(df_base, ["VALOR", "RECEBIDO"]) or achar(df_base, ["VALOR", "EMPENHADO"]) or achar(df_base, ["VALOR", "REPASSE"])
         col_autor = achar(df_base, ["NOME", "AUTOR"]) or achar(df_base, ["PARLAMENTAR"])
         col_dest  = achar(df_base, ["FAVORECIDO"]) or achar(df_base, ["MUNICÍPIO"])
@@ -132,7 +120,6 @@ def exibir_radar():
                 filtro_mes = str(mes_sel).zfill(2)
                 df_final = df_final[df_final['MES_REF'] == filtro_mes]
 
-            # --- INTERFACE ---
             if not df_final.empty:
                 v_total = df_final[col_v_emp].sum()
                 k1, k2, k3 = st.columns(3)
