@@ -51,10 +51,9 @@ st.set_page_config(page_title="Core Essence", page_icon="🛰️", layout="wide"
 # --- TELAS ADICIONAIS ---
 def tela_cadastro():
     st.title("🚀 Cadastro de Novo Consultor")
-    if st.button("⬅️ Voltar"):
-        st.session_state['tela'] = 'home'
-        st.rerun()
-    st.info("Área de cadastro em desenvolvimento para integração com pagamento.")
+  if st.button("QUERO ME CADASTRAR AGORA", use_container_width=True):
+    st.session_state.pagina_atual = "CADASTRO" # Altera para a sua página de formulário
+    st.rerun()
 
 # --- NAVEGAÇÃO PRINCIPAL ---
 def executar():
