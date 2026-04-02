@@ -46,8 +46,8 @@ def exibir_radar():
         st.markdown("---")
         st.markdown(f"**Nível de Acesso:** `{plano_user}`")
         if local_liberado and local_liberado != "NAN":
-            label_local = "Estado" if "PRATA" in plano_user else "Município(s)"
-            st.info(f"📍 **{label_local} Liberado:**\n{local_liberado}")
+            label_local = "Estado" if "PRATA" in plano_user else "Localidade(s) Liberada(s)"
+            st.info(f"📍 **{label_local}:**\n{local_liberado}")
         st.markdown("---")
 
     col_f1, col_f2, col_f3 = st.columns(3)
@@ -63,32 +63,42 @@ def exibir_radar():
         df_base, msg = carregar_dados_drive(id_chave)
     
     if df_base is not None:
+        # Mapeamento de possíveis nomes de colunas
         C_UF = "UF"
         C_MUN = "MUNICÍPIO"
         C_ANO = "ANO DA EMENDA"
         C_VALOR = "VALOR EMPENHADO"
         C_AUTOR = "NOME DO AUTOR DA EMENDA"
 
-        # --- 1. LIMPEZA DE DADOS INVÁLIDOS (SEM INFORMAÇÃO) ---
-        for col in [C_MUN, C_AUTOR, C_UF]:
+        # --- 1. LIMPEZA DE DADOS INVÁLIDOS (TRATAMENTO DE ERROS DE COLUNA) ---
+        termos_nulos = ["SEM INFORMAÇÃO", "SEM INFORMACAO", "NÃO INFORMADO", "NAN", "NONE", "0", "0.0"]
+        
+        for col in [C_UF, C_MUN, C_AUTOR]:
             if col in df_base.columns:
                 df_base[col] = df_base[col].astype(str).str.upper().str.strip()
-        
-        # Filtro para remover linhas inúteis
-        termos_nulos = ["SEM INFORMAÇÃO", "SEM INFORMACAO", "NÃO INFORMADO", "NAN", "NONE", "0", "0.0"]
-        df_base = df_base[~df_base[C_MUN].isin(termos_nulos)]
+                # Remove as linhas "Sem Informação" apenas se a coluna existir
+                df_base = df_base[~df_base[col].isin(termos_nulos)]
 
-        # --- 2. TRAVA DE SEGURANÇA ---
+        # --- 2. TRAVA DE SEGURANÇA (BRONZE, PRATA E OURO) ---
         if local_liberado and local_liberado != "NAN" and "DIAMANTE" not in plano_user:
             locais = [l.strip().upper() for l in local_liberado.split(',')]
             tradutor_uf = {"RJ": "RIO DE JANEIRO", "SP": "SÃO PAULO", "MG": "MINAS GERAIS"}
             
             if "BRONZE" in plano_user:
-                df_base = df_base[df_base[C_MUN].isin(locais)]
+                if C_MUN in df_base.columns:
+                    df_base = df_base[df_base[C_MUN].isin(locais)]
+            
             elif "PRATA" in plano_user:
-                uf_alvo = locais[0]
-                nome_extenso = tradutor_uf.get(uf_alvo, uf_alvo)
-                df_base = df_base[(df_base[C_UF] == uf_alvo) | (df_base[C_UF] == nome_extenso)]
+                if C_UF in df_base.columns:
+                    uf_alvo = locais[0]
+                    nome_ext = tradutor_uf.get(uf_alvo, uf_alvo)
+                    df_base = df_base[(df_base[C_UF] == uf_alvo) | (df_base[C_UF] == nome_ext)]
+
+            elif "OURO" in plano_user:
+                if C_UF in df_base.columns:
+                    # O Ouro filtra múltiplos estados (Ex: RJ, SP, MG)
+                    lista_extensa = [tradutor_uf.get(x, x) for x in locais]
+                    df_base = df_base[(df_base[C_UF].isin(locais)) | (df_base[C_UF].isin(lista_extensa))]
 
         # --- 3. FILTRO DE ANO ---
         if C_ANO in df_base.columns:
@@ -98,25 +108,35 @@ def exibir_radar():
             df_final = df_base.copy()
 
         # --- 4. EXIBIÇÃO ---
-        if C_VALOR in df_final.columns:
-            df_final[C_VALOR] = df_final[C_VALOR].apply(limpar_valor_monetario)
+        # Busca automática da coluna de valor (tenta Valor Empenhado ou Pago)
+        col_v = C_VALOR if C_VALOR in df_final.columns else None
+        if not col_v:
+            # Caso o arquivo de favorecidos use outro nome, tentamos achar 'VALOR'
+            col_v = next((c for c in df_final.columns if "VALOR" in c), None)
+
+        if col_v:
+            df_final[col_v] = df_final[col_v].apply(limpar_valor_monetario)
             
             if not df_final.empty:
-                v_total = df_final[C_VALOR].sum()
-                st.metric(f"Total Identificado em {ano_sel}", formatar_brl(v_total))
+                v_total = df_final[col_v].sum()
+                st.metric(f"Total em {ano_sel}", formatar_brl(v_total))
                 
                 col_g1, col_g2 = st.columns(2)
                 with col_g1:
                     if C_AUTOR in df_final.columns:
                         st.write("📈 **Top Autores**")
-                        chart = df_final[~df_final[C_AUTOR].isin(termos_nulos)].groupby(C_AUTOR)[C_VALOR].sum().sort_values(ascending=False).head(10)
+                        chart = df_final.groupby(C_AUTOR)[col_v].sum().sort_values(ascending=False).head(10)
                         st.bar_chart(chart)
                 with col_g2:
                     if C_MUN in df_final.columns:
                         st.write("📍 **Top Municípios**")
-                        chart_mun = df_final.groupby(C_MUN)[C_VALOR].sum().sort_values(ascending=False).head(10)
+                        chart_mun = df_final.groupby(C_MUN)[col_v].sum().sort_values(ascending=False).head(10)
                         st.bar_chart(chart_mun)
 
                 st.dataframe(df_final, use_container_width=True)
             else:
-                st.warning(f"Nenhum dado válido para {ano_sel} com os filtros atuais.")
+                st.warning(f"Nenhum dado encontrado para {ano_sel}.")
+        else:
+            st.error("Coluna de valor financeiro não identificada nesta base.")
+    else:
+        st.error(msg)
