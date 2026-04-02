@@ -18,10 +18,8 @@ def carregar_dados_drive(id_secret):
     output = f"{id_secret}.csv"
     try:
         gdown.download(url, output, quiet=True, fuzzy=True)
-        # Forçamos o separador ';' que você confirmou no bloco de notas
+        # Separador ';' conforme seu Bloco de Notas
         df = pd.read_csv(output, sep=';', encoding='latin1', on_bad_lines='skip', low_memory=False)
-        
-        # Limpeza de nomes de colunas (Mantemos o padrão para bater com o script)
         df.columns = [str(c).strip().upper() for c in df.columns]
         return df, "Sucesso"
     except Exception as e:
@@ -41,31 +39,43 @@ def limpar_valor_monetario(v):
 def exibir_radar():
     st.title("🏛️ Radar de Emendas Parlamentares")
     
-    usuario = st.session_state.get('usuario_logado')
+    # --- 1. RECUPERAÇÃO DE DADOS DO USUÁRIO ---
     plano_user = str(st.session_state.get('usuario_plano', 'BRONZE')).upper()
-    local_liberado = str(st.session_state.get('usuario_local', '')).upper()
+    # Recupera o local liberado diretamente do dicionário do usuário logado
+    usuario_info = st.session_state.get('usuario_logado', {})
+    local_liberado = str(usuario_info.get('local_liberado', '')).upper().strip()
 
+    # --- 2. PAINEL INFORMATIVO NO MENU LATERAL (O QUE VOCÊ PEDIU) ---
+    with st.sidebar:
+        st.markdown("---")
+        st.markdown(f"**Nível de Acesso:** `{plano_user}`")
+        if local_liberado and local_liberado != "NAN":
+            label_local = "Estado" if "PRATA" in plano_user else "Município(s)"
+            st.info(f"📍 **{label_local} Liberado:**\n{local_liberado}")
+        st.markdown("---")
+
+    # --- 3. FILTROS DE INTERFACE ---
     col_f1, col_f2, col_f3 = st.columns(3)
     with col_f1:
         fonte_sel = st.selectbox("Base de Dados:", list(FONTES_DADOS.keys()))
     with col_f2:
         ano_sel = st.selectbox("Ano de Referência", [2026, 2025, 2024], index=0)
     with col_f3:
-        mes_sel = "Todos" # Visão Geral não costuma ter mês separado em coluna única
+        mes_sel = "Todos"
 
     id_chave = FONTES_DADOS[fonte_sel]
     with st.spinner("🛰️ Sincronizando dados CORE ESSENCE..."):
         df_base, msg = carregar_dados_drive(id_chave)
     
     if df_base is not None:
-        # --- MAPEAMENTO COM BASE NO SEU BLOCO DE NOTAS ---
+        # Colunas mapeadas do seu CSV
         C_UF = "UF"
         C_MUN = "MUNICÍPIO"
         C_ANO = "ANO DA EMENDA"
         C_VALOR = "VALOR EMPENHADO"
         C_AUTOR = "NOME DO AUTOR DA EMENDA"
 
-        # --- APLICAÇÃO DA SEGURANÇA ---
+        # --- 4. TRAVA DE SEGURANÇA (AJUSTADA PARA FILTRAR CORRETAMENTE) ---
         if local_liberado and local_liberado != "NAN" and "DIAMANTE" not in plano_user:
             locais = [l.strip().upper() for l in local_liberado.split(',')]
             
@@ -75,18 +85,22 @@ def exibir_radar():
             
             elif "PRATA" in plano_user:
                 if C_UF in df_base.columns:
-                    uf_alvo = locais[0] # Ex: RJ
+                    # Filtra apenas o estado do usuário (Ex: RJ)
+                    uf_alvo = locais[0] 
                     df_base = df_base[df_base[C_UF].astype(str).str.upper().str.strip() == uf_alvo]
-                    st.sidebar.info(f"📍 Estado: {uf_alvo}")
 
-        # --- FILTRO DE ANO ---
+            elif "OURO" in plano_user:
+                if C_UF in df_base.columns:
+                    df_base = df_base[df_base[C_UF].astype(str).str.upper().isin(locais)]
+
+        # --- 5. FILTRO DE ANO ---
         if C_ANO in df_base.columns:
             df_base[C_ANO] = df_base[C_ANO].astype(str).str.strip()
             df_final = df_base[df_base[C_ANO] == str(ano_sel)]
         else:
             df_final = df_base
 
-        # --- EXIBIÇÃO ---
+        # --- 6. EXIBIÇÃO DOS GRÁFICOS E TABELA ---
         if C_VALOR in df_final.columns:
             df_final[C_VALOR] = df_final[C_VALOR].apply(limpar_valor_monetario)
             
