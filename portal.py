@@ -57,37 +57,55 @@ def tela_cadastro():
         st.session_state['tela'] = 'home'
         st.rerun()
 
+    # Criamos o formulário
     with st.form("form_cadastro_novo"):
         nome = st.text_input("Nome Completo")
         email = st.text_input("E-mail (Será seu usuário)")
         senha = st.text_input("Crie uma Senha", type="password")
         
-        # Seleção de Plano com Informação Dinâmica
-        plano_selecionado = st.selectbox("Escolha seu Plano", ["BRONZE", "PRATA", "OURO", "DIAMANTE"])
+        # 1. Seleção de Plano
+        plano_selecionado = st.selectbox(
+            "Escolha seu Plano", 
+            ["BRONZE", "PRATA", "OURO", "DIAMANTE"],
+            key="escolha_plano_form"
+        )
         
-        # Quadro de informações do plano (aparece dentro do formulário)
+        # 2. LÓGICA DINÂMICA DE MENSAGENS E CAMPOS
         if plano_selecionado == "BRONZE":
             st.info("📦 **Plano BRONZE:** Acesso a até **03 Municípios** específicos + 05 Revisões de Estatuto/mês.")
+            label_local = "Liste as 03 Cidades de Interesse"
+            placeholder_local = "Ex: Presidente Prudente, Álvares Machado, Pirapozinho"
+            
         elif plano_selecionado == "PRATA":
             st.info("🥈 **Plano PRATA:** Acesso a **01 Estado completo** + 15 Revisões de Estatuto/mês.")
+            label_local = "Digite o Estado (UF) de Interesse"
+            placeholder_local = "Ex: SP ou Rio de Janeiro"
+            
         elif plano_selecionado == "OURO":
             st.info("🥇 **Plano OURO:** Acesso a **03 Estados completos** + 50 Revisões de Estatuto/mês.")
-        elif plano_selecionado == "DIAMANTE":
+            label_local = "Liste os 03 Estados (UF) de Interesse"
+            placeholder_local = "Ex: SP, RJ, MG"
+            
+        else:  # DIAMANTE
             st.info("💎 **Plano DIAMANTE:** Acesso **Nacional (Todos os Estados)** + 200 Revisões de Estatuto/mês.")
+            label_local = "Localidade (Acesso Nacional Liberado)"
+            placeholder_local = "Pode deixar em branco ou digitar BRASIL"
 
-        localidade = st.text_input("Localidade de Interesse (Ex: Presidente Prudente ou SP, RJ, MG)")
+        # 3. CAMPO DE LOCALIDADE DINÂMICO
+        localidade = st.text_input(label_local, placeholder=placeholder_local)
         
         btn_enviar = st.form_submit_button("FINALIZAR CADASTRO")
         
         if btn_enviar:
             if nome and email and senha:
+                # Formato para a planilha: Usuario, Senha, Plano, Localidade, Status
                 novo_usuario = [email, senha, plano_selecionado, localidade, "pendente"]
                 if salvar_cadastro_google_sheets(novo_usuario):
-                    st.success("✅ Cadastro enviado! Aguarde a liberação administrativa.")
+                    st.success("✅ Cadastro enviado com sucesso! Aguarde a liberação administrativa.")
                 else:
-                    st.error("Erro ao salvar cadastro.")
+                    st.error("Erro ao salvar cadastro. Verifique sua conexão.")
             else:
-                st.warning("Preencha todos os campos.")
+                st.warning("Por favor, preencha todos os campos obrigatórios.")
 
 # --- 4. NAVEGAÇÃO E LÓGICA PRINCIPAL ---
 def executar():
