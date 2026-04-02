@@ -41,11 +41,10 @@ def exibir_radar():
     
     # --- 1. RECUPERAÇÃO DE DADOS DO USUÁRIO ---
     plano_user = str(st.session_state.get('usuario_plano', 'BRONZE')).upper()
-    # Recupera o local liberado diretamente do dicionário do usuário logado
     usuario_info = st.session_state.get('usuario_logado', {})
     local_liberado = str(usuario_info.get('local_liberado', '')).upper().strip()
 
-    # --- 2. PAINEL INFORMATIVO NO MENU LATERAL (O QUE VOCÊ PEDIU) ---
+    # --- 2. PAINEL INFORMATIVO NO MENU LATERAL ---
     with st.sidebar:
         st.markdown("---")
         st.markdown(f"**Nível de Acesso:** `{plano_user}`")
@@ -68,62 +67,7 @@ def exibir_radar():
         df_base, msg = carregar_dados_drive(id_chave)
     
     if df_base is not None:
-        # Colunas mapeadas do seu CSV
         C_UF = "UF"
         C_MUN = "MUNICÍPIO"
         C_ANO = "ANO DA EMENDA"
-        C_VALOR = "VALOR EMPENHADO"
-        C_AUTOR = "NOME DO AUTOR DA EMENDA"
-
-        # --- 4. TRAVA DE SEGURANÇA (AJUSTADA PARA FILTRAR CORRETAMENTE) ---
-        if local_liberado and local_liberado != "NAN" and "DIAMANTE" not in plano_user:
-            locais = [l.strip().upper() for l in local_liberado.split(',')]
-            
-            if "BRONZE" in plano_user:
-                if C_MUN in df_base.columns:
-                    df_base = df_base[df_base[C_MUN].astype(str).str.upper().isin(locais)]
-            
-            elif "PRATA" in plano_user:
-                if C_UF in df_base.columns:
-                    # Filtra apenas o estado do usuário (Ex: RJ)
-                    uf_alvo = locais[0] 
-                    df_base = df_base[df_base[C_UF].astype(str).str.upper().str.strip() == uf_alvo]
-
-            elif "OURO" in plano_user:
-                if C_UF in df_base.columns:
-                    df_base = df_base[df_base[C_UF].astype(str).str.upper().isin(locais)]
-
-        # --- 5. FILTRO DE ANO ---
-        if C_ANO in df_base.columns:
-            df_base[C_ANO] = df_base[C_ANO].astype(str).str.strip()
-            df_final = df_base[df_base[C_ANO] == str(ano_sel)]
-        else:
-            df_final = df_base
-
-        # --- 6. EXIBIÇÃO DOS GRÁFICOS E TABELA ---
-        if C_VALOR in df_final.columns:
-            df_final[C_VALOR] = df_final[C_VALOR].apply(limpar_valor_monetario)
-            
-            if not df_final.empty:
-                v_total = df_final[C_VALOR].sum()
-                st.metric(f"Total Identificado em {ano_sel}", formatar_brl(v_total))
-                
-                col_g1, col_g2 = st.columns(2)
-                with col_g1:
-                    if C_AUTOR in df_final.columns:
-                        st.write("📈 **Top Autores**")
-                        chart = df_final.groupby(C_AUTOR)[C_VALOR].sum().sort_values(ascending=False).head(10)
-                        st.bar_chart(chart)
-                with col_g2:
-                    if C_MUN in df_final.columns:
-                        st.write("📍 **Top Municípios**")
-                        chart_mun = df_final.groupby(C_MUN)[C_VALOR].sum().sort_values(ascending=False).head(10)
-                        st.bar_chart(chart_mun)
-
-                st.dataframe(df_final, use_container_width=True)
-            else:
-                st.warning(f"Nenhum dado para {ano_sel} com os filtros atuais.")
-        else:
-            st.error(f"Coluna '{C_VALOR}' não encontrada.")
-    else:
-        st.error(msg)
+        C_VAL
