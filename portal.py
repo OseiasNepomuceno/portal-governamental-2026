@@ -49,23 +49,41 @@ def autenticar_usuario(usuario_digitado, senha_digitada):
 st.set_page_config(page_title="Core Essence", page_icon="🛰️", layout="wide")
 
 # --- NAVEGAÇÃO ---
-def executar():
-    if 'logado' not in st.session_state:
-        st.session_state['logado'] = False
-    if 'tela' not in st.session_state:
-        st.session_state['tela'] = 'home'
-
+# Fluxo de Telas (Login / Cadastro / Home)
     if not st.session_state['logado']:
         if st.session_state['tela'] == 'home':
-            st.title("🛰️ Core Essence - Inteligência Governamental")
-            c1, c2 = st.columns(2)
-            if c1.button("👤 LOGIN", use_container_width=True):
-                st.session_state['tela'] = 'login'
-                st.rerun()
-            if c2.button("🚀 CADASTRO", use_container_width=True):
-                st.session_state['tela'] = 'cadastro'
-                st.rerun()
-        
+            # --- HEADER DE IMPACTO ---
+            st.markdown("<h1 style='text-align: center;'>🛰️ Core Essence</h1>", unsafe_allow_html=True)
+            st.markdown("<h3 style='text-align: center; color: #555;'>Inteligência Governamental Estratégica</h3>", unsafe_allow_html=True)
+            
+            st.write("\n") # Espaçamento
+            
+            # --- AS 3 FRASES DE IMPACTO EM CARDS ---
+            c_f1, c_f2, c_f3 = st.columns(3)
+            
+            with c_f1:
+                st.info("**Para nossos Consultores:**\n\n*Bem-vindo de volta ao centro da estratégia. Sua inteligência de dados está sincronizada e pronta para novas oportunidades.*")
+            
+            with c_f2:
+                st.success("**Para novos Membros:**\n\n*Você está a um passo de transformar dados governamentais em faturamento real. O acesso ao maior radar de recursos do país começa aqui.*")
+            
+            with c_f3:
+                st.warning("**Por que ser Core Essence?**\n\n*Não apenas monitore, antecipe-se. No jogo do setor público, a Core Essence é a diferença entre quem busca informações e quem domina resultados.*")
+
+            st.markdown("---")
+            
+            # --- BOTÕES DE ACESSO ---
+            col_b1, col_b2 = st.columns(2)
+            with col_b1:
+                if st.button("👤 JÁ SOU CONSULTOR (LOGIN)", use_container_width=True, type="primary"):
+                    st.session_state['tela'] = 'login'
+                    st.rerun()
+            with col_b2:
+                if st.button("🚀 QUERO ME CADASTRAR AGORA", use_container_width=True):
+                    st.session_state['tela'] = 'cadastro'
+                    st.rerun()
+            
+            st.markdown("<p style='text-align: center; font-size: 0.8rem; color: gray;'>© 2026 Core Essence - Todos os direitos reservados.</p>", unsafe_allow_html=True)
         elif st.session_state['tela'] == 'login':
             st.title("🔑 Acesso ao Portal")
             if st.button("⬅️ Voltar"):
