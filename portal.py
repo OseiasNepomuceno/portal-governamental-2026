@@ -51,9 +51,32 @@ st.set_page_config(page_title="Core Essence", page_icon="🛰️", layout="wide"
 # --- TELAS ADICIONAIS ---
 def tela_cadastro():
     st.title("🚀 Cadastro de Novo Consultor")
-  if st.button("QUERO ME CADASTRAR AGORA", use_container_width=True):
-    st.session_state.pagina_atual = "CADASTRO" # Altera para a sua página de formulário
-    st.rerun()
+    st.write("Preencha os dados abaixo para solicitar seu acesso ao Radar.")
+    
+    if st.button("⬅️ Voltar para o Início"):
+        st.session_state['tela'] = 'home'
+        st.rerun()
+
+    with st.form("form_cadastro_novo"):
+        nome = st.text_input("Nome Completo")
+        email = st.text_input("E-mail (Será seu usuário)")
+        senha = st.text_input("Crie uma Senha", type="password")
+        plano_desejado = st.selectbox("Escolha seu Plano", ["BRONZE", "PRATA", "OURO", "DIAMANTE"])
+        localidade = st.text_input("Localidade de Interesse (Cidade ou UF)")
+        
+        btn_enviar = st.form_submit_button("FINALIZAR CADASTRO")
+        
+        if btn_enviar:
+            if nome and email and senha:
+                # Formato para a planilha: Usuario, Senha, Plano, Localidade, Status
+                novo_usuario = [email, senha, plano_desejado, localidade, "pendente"]
+                if salvar_cadastro_google_sheets(novo_usuario):
+                    st.success("✅ Cadastro enviado com sucesso! Aguarde a liberação administrativa.")
+                    st.info("Área de integração com pagamento em desenvolvimento.")
+                else:
+                    st.error("Erro ao salvar cadastro. Tente novamente mais tarde.")
+            else:
+                st.warning("Por favor, preencha todos os campos obrigatórios.")
 
 # --- NAVEGAÇÃO PRINCIPAL ---
 def executar():
@@ -116,11 +139,11 @@ def executar():
             user_comparar = str(user_raw).lower().strip()
             st.info(f"🏆 Plano: {plano}")
 
-            menu = ["📊 Recursos", "🏛️ Radar de Emendas", "📜 Revisão de Estatuto"]
+            menu = ["📊 Recursos", "🏛️ Radar de Emendas", "📜 Revisão de Estatuto", "🚪 Sair"]
             if user_comparar == "admin":
-                menu.append("⚙️ Gestão Administrativa")
-            menu.append("🚪 Sair")
-            escolha = st.radio("Módulos:", menu)
+                menu.insert(3, "⚙️ Gestão Administrativa")
+            
+            escolha = st.sidebar.radio("Módulos:", menu)
 
         # --- REDIRECIONAMENTO DE MÓDULOS ---
         if escolha == "📊 Recursos":
@@ -133,19 +156,15 @@ def executar():
             importlib.reload(radar)
             radar.exibir_radar()
 
-        # ESTE BLOCO ABAIXO DEVE ESTAR NO MESMO ALINHAMENTO DOS ANTERIORES
         elif escolha == "📜 Revisão de Estatuto":
             st.title("📜 Revisão de Estatuto")
-            # Define o limite baseado no plano (Bronze ganha 5 revisões)
             limite = {"BRONZE": 5, "PRATA": 15, "OURO": 50, "DIAMANTE": 200}.get(plano, 5)
             st.info(f"Seu plano **{plano}** permite {limite} revisões mensais.")
-            
             st.write("---")
             st.subheader("Análise de Conformidade")
             arquivo = st.file_uploader("Arraste o arquivo do Estatuto (PDF)", type=["pdf"])
             if arquivo:
                 st.success("Arquivo recebido! Iniciando pré-análise...")
-                # Aqui entrará a integração com a IA de revisão futuramente
 
         elif escolha == "⚙️ Gestão Administrativa":
             import gestao as adm
