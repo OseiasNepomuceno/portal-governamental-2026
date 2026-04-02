@@ -128,7 +128,7 @@ def executar():
             importlib.reload(rec)
             rec.exibir_radar()
         elif escolha == "🏛️ Radar de Emendas":
-            import radar_emenda_2026 as radar
+            import radar_emendas_2026 as radar
             importlib.reload(radar)
             radar.exibir_radar()
         elif escolha == "⚙️ Gestão Administrativa":
