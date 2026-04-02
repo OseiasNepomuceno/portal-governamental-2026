@@ -4,6 +4,9 @@ import gdown
 import os
 import importlib
 import gspread
+import smtplib
+from email.mime.text import MIMEText
+import urllib.parse
 from google.oauth2.service_account import Credentials
 
 # --- 1. FUNÇÕES DE APOIO (CONEXÃO GOOGLE) ---
@@ -195,6 +198,31 @@ def executar():
         elif escolha == "🚪 Sair":
             st.session_state.clear()
             st.rerun()
+
+def enviar_aviso_email(nome, plano, email_cliente):
+    # CONFIGURAÇÃO DO SEU GMAIL
+    meu_email = "oseiasnepom@gmail.com" 
+    minha_senha = "tukh raae ebnc dgoe" # Senha de 16 dígitos do Google
+    
+    msg = MIMEText(f"Olá Oseias!\n\nUm novo consultor acabou de se cadastrar:\n\nNome: {nome}\nPlano: {plano}\nE-mail: {email_cliente}\n\nVerifique a planilha ID_LICENÇAS para liberar o acesso.")
+    msg['Subject'] = f"🚀 NOVO CADASTRO: {plano} - {nome}"
+    msg['From'] = meu_email
+    msg['To'] = meu_email # Envia para você mesmo
+
+    try:
+        server = smtplib.SMTP_SSL('smtp.gmail.com', 465)
+        server.login(meu_email, minha_senha)
+        server.sendmail(meu_email, meu_email, msg.as_string())
+        server.quit()
+        return True
+    except:
+        return False
+
+def gerar_link_whatsapp(nome, plano):
+    texto = f"Olá Core Essence! Acabei de me cadastrar no Portal Radar 2026.\nNome: {nome}\nPlano Escolhido: {plano}.\nAguardo liberação!"
+    texto_url = urllib.parse.quote(texto)
+    # Substitua pelo seu número com código do país e DDD
+    return f"https://wa.me/5518991466238?text={texto_url}"
 
 if __name__ == "__main__":
     executar()
