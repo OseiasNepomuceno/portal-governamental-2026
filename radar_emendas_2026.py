@@ -4,11 +4,10 @@ import pandas as pd
 import gdown
 import os
 
-# --- CONFIGURAÇÕES DE DADOS ---
+# --- CONFIGURAÇÕES DE DADOS (AJUSTADO: REMOVIDO CONVÊNIOS) ---
 FONTES_DADOS = {
     "Visão Geral (Emendas)": "ID_EMENDAS_GERAL",
-    "Por Favorecido (Quem recebe)": "ID_EMENDAS_FAVORECIDO",
-    "Convênios (Detalhado)": "ID_EMENDAS_CONVENIOS"
+    "Por Favorecido (Quem recebe)": "ID_EMENDAS_FAVORECIDO"
 }
 
 @st.cache_data(ttl=600, show_spinner=False)
@@ -68,6 +67,7 @@ def exibir_radar():
     # --- FILTROS NO TOPO ---
     col_f1, col_f2, col_f3 = st.columns(3)
     with col_f1:
+        # Aqui o selectbox usará o dicionário já sem a opção de Convênios
         fonte_sel = st.selectbox("Base de Dados:", list(FONTES_DADOS.keys()))
     with col_f2:
         ano_sel = st.selectbox("Ano de Referência", [2026, 2025, 2024], index=0)
