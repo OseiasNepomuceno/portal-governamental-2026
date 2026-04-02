@@ -138,9 +138,22 @@ def tela_cadastro():
                 if sucesso:
                     st.balloons()
                     st.success(f"🚀 Excelente, {nome}! Cadastro salvo com sucesso.")
-                    st.markdown(f"### Pagamento do Plano: {escolha.split('-')[0]}")
-                    st.code("SUA-CHAVE-PIX-AQUI", language="text")
-                    st.info("Após o pagamento, seu acesso será liberado pelo suporte.")
+                    
+                    # Criando a mensagem personalizada para o seu WhatsApp
+                    # Substitua pelo SEU número com DDD (ex: 5518999999999)
+                    seu_numero = "5518991466238" 
+                    mensagem_zap = f"Olá Core Essence, acabei de me cadastrar no Plano {escolha.split('-')[0].strip()}. Segue o comprovante!"
+                    
+                    # Formata o link para o WhatsApp
+                    link_whatsapp = f"https://wa.me/{seu_numero}?text={requests.utils.quote(mensagem_zap)}"
+                    
+                    st.markdown(f"### 💳 Próximo Passo: Pagamento")
+                    st.info("Para liberar seu acesso agora, realize o PIX e clique no botão abaixo para me enviar o comprovante.")
+                    
+                    # Botão visual para o WhatsApp
+                    st.link_button("📲 ENVIAR COMPROVANTE VIA WHATSAPP", link_whatsapp)
+                    
+                    st.code("65919850000133", language="text")
             else:
                 st.warning("Por favor, preencha todos os campos.")
 # --- 4. LÓGICA DE NAVEGAÇÃO PRINCIPAL ---
