@@ -82,35 +82,32 @@ def exibir_radar():
         df_base, msg = carregar_dados_drive(id_chave)
     
     if df_base is not None:
-        # --- 2. APLICAÇÃO DA TRAVA DE SEGURANÇA ---
+       # --- 2. APLICAÇÃO DA TRAVA DE SEGURANÇA (CORRIGIDO) ---
         col_uf = achar(df_base, ["UF"]) or "UF"
         col_mun = achar(df_base, ["MUNICÍPIO"]) or achar(df_base, ["CIDADE"]) or "NOME MUNICÍPIO"
 
         if local_liberado and local_liberado != "NAN" and "DIAMANTE" not in plano_user:
-            if "BRONZE" in plano_user:
-                cidades = [c.strip() for c in local_liberado.split(',')]
-                if col_mun in df_base.columns:
-                    df_base = df_base[df_base[col_mun].astype(str).str.upper().isin(cidades)]
-                    st.sidebar.warning(f"📍 Cidades liberadas: {len(cidades)}")
+            # Normaliza os locais (remove espaços e deixa em maiúsculo)
+            locais_permitidos = [loc.strip().upper() for loc in local_liberado.split(',')]
             
-           elif "PRATA" in plano_user:
-                # 1. Filtro por Estado (UF)
+            if "BRONZE" in plano_user:
+                if col_mun in df_base.columns:
+                    df_base = df_base[df_base[col_mun].astype(str).str.upper().isin(locais_permitidos)]
+                    st.sidebar.warning(f"📍 Cidades liberadas: {len(locais_permitidos)}")
+            
+            elif "PRATA" in plano_user:
+                # O Prata libera o Estado inteiro (UF)
                 if col_uf in df_base.columns:
-                    # Garantimos que compare 'SP' com 'SP' sem espaços e em maiúsculo
-                    estado_alvo = str(local_liberado).strip().upper()
+                    estado_alvo = locais_permitidos[0] # Pega a primeira UF da lista (ex: SP)
                     df_base = df_base[df_base[col_uf].astype(str).str.upper().str.strip() == estado_alvo]
                     st.sidebar.info(f"📍 Estado liberado: {estado_alvo}")
-                
-                # 2. Se for 'Visão Geral', o Prata TEM que ver os dados do Estado
-                # Se cair aqui e df_base estiver vazio, avisamos o usuário
-                if df_base.empty:
-                    st.sidebar.warning(f"⚠️ Sem dados para a UF: {local_liberado}")
+                else:
+                    st.sidebar.error("⚠️ Coluna UF não encontrada para o Plano Prata.")
 
             elif "OURO" in plano_user:
-                estados = [e.strip() for e in local_liberado.split(',')]
                 if col_uf in df_base.columns:
-                    df_base = df_base[df_base[col_uf].astype(str).str.upper().isin(estados)]
-                    st.sidebar.info(f"📍 Estados liberados: {len(estados)}")
+                    df_base = df_base[df_base[col_uf].astype(str).str.upper().isin(locais_permitidos)]
+                    st.sidebar.info(f"📍 Estados liberados: {len(locais_permitidos)}")
 
         # --- PROCESSAMENTO DOS DADOS FILTRADOS ---
         col_v_emp = achar(df_base, ["VALOR", "RECEBIDO"]) or achar(df_base, ["VALOR", "EMPENHADO"]) or achar(df_base, ["VALOR", "REPASSE"])
