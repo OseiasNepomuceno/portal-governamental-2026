@@ -1,4 +1,4 @@
-# Arquivo: recursos.py - Atualizado com Trava de Segurança em 03/04/2026
+# Arquivo: recursos.py - Atualizado com Ajuste de Match em 03/04/2026
 import streamlit as st
 import pandas as pd
 import gdown
@@ -16,7 +16,6 @@ def limpar_valor_monetario(v):
 
 @st.cache_data(ttl=600)
 def carregar_dados_recursos():
-    # Certifique-se que o segredo 'file_id_convenios' está no Streamlit Cloud
     nome_arquivo = "20260320_Convenios.csv"
     file_id = st.secrets.get("file_id_convenios")
     
@@ -30,7 +29,6 @@ def carregar_dados_recursos():
         if not os.path.exists(nome_arquivo):
             gdown.download(url, nome_arquivo, quiet=True)
         
-        # Tenta carregar com diferentes separadores
         df = pd.read_csv(nome_arquivo, sep=';', encoding='latin1', on_bad_lines='skip')
         if len(df.columns) <= 1:
             df = pd.read_csv(nome_arquivo, sep=',', encoding='latin1', on_bad_lines='skip')
@@ -52,7 +50,6 @@ def carregar_dados_recursos():
 def exibir_recursos():
     st.title("📊 Painel de Recursos Governamentais")
     
-    # Carrega a base
     df_base = carregar_dados_recursos()
 
     if not df_base.empty:
@@ -66,23 +63,29 @@ def exibir_recursos():
             col_uf = 'UF'
             col_mun = 'NOME MUNICÍPIO'
 
-            # Aplicando restrições de visibilidade conforme o plano
+            # --- [AJUSTE DE MATCH] NORMALIZAÇÃO PARA PLANO BRONZE ---
             if "BRONZE" in plano_user and col_mun in df_base.columns:
+                # Limpa e normaliza a lista de cidades permitidas da planilha
                 cidades_permitidas = [c.strip().upper() for c in local_liberado.split(',')]
-                df_base = df_base[df_base[col_mun].str.upper().isin(cidades_permitidas)]
+                
+                # Garante que a coluna do banco de dados também esteja limpa e em caixa alta
+                df_base[col_mun] = df_base[col_mun].fillna('').astype(str).str.strip().upper()
+                
+                # Filtra apenas as cidades que batem exatamente com a lista normalizada
+                df_base = df_base[df_base[col_mun].isin(cidades_permitidas)]
                 
             elif "PRATA" in plano_user and col_uf in df_base.columns:
-                df_base = df_base[df_base[col_uf].str.upper() == local_liberado]
+                uf_alvo = local_liberado.strip().upper()
+                df_base = df_base[df_base[col_uf].str.strip().upper() == uf_alvo]
                 
             elif "OURO" in plano_user and col_uf in df_base.columns:
                 estados_permitidos = [e.strip().upper() for e in local_liberado.split(',')]
-                df_base = df_base[df_base[col_uf].str.upper().isin(estados_permitidos)]
+                df_base = df_base[df_base[col_uf].str.strip().upper().isin(estados_permitidos)]
 
         # --- MAPEAMENTO E FILTROS INTERATIVOS ---
         col_valor = next((c for c in df_base.columns if 'VALOR' in c), None)
         col_ano = 'ANO_FILTRO' if 'ANO_FILTRO' in df_base.columns else None
         col_uf = 'UF' if 'UF' in df_base.columns else None
-        col_mun = 'NOME MUNICÍPIO' if 'NOME MUNICÍPIO' in df_base.columns else None
 
         if col_valor:
             df_base['VALOR_NUM'] = df_base[col_valor].apply(limpar_valor_monetario)
@@ -98,7 +101,7 @@ def exibir_recursos():
             opcoes_uf = ["Todos"] + sorted(df_base[col_uf].dropna().unique().astype(str).tolist()) if col_uf else ["Todos"]
             filtro_uf = st.selectbox("Filtrar Estado:", opcoes_uf, key="rec_uf")
 
-        # Lógica de Filtragem
+        # Lógica de Filtragem Final
         df_f = df_base
         if termo:
             mask = df_f.astype(str).apply(lambda x: x.str.contains(termo, case=False)).any(axis=1)
@@ -108,7 +111,7 @@ def exibir_recursos():
         if filtro_uf != "Todos":
             df_f = df_f[df_f[col_uf] == filtro_uf]
 
-        # --- MÉTRICAS COM AJUSTE DE SEGURANÇA (EVITA TELA BRANCA) ---
+        # --- MÉTRICAS COM SEGURANÇA ---
         st.markdown("---")
         m1, m2 = st.columns(2)
         
@@ -121,17 +124,6 @@ def exibir_recursos():
             
         m2.metric("Resultados Encontrados", len(df_f))
 
-        # --- EXIBIÇÃO DA TABELA ---
+        # --- EXIBIÇÃO ---
         if df_f.empty:
-            st.warning("📍 Nenhum dado encontrado para os filtros selecionados ou para sua região liberada.")
-        else:
-            st.dataframe(df_f.head(300), use_container_width=True)
-            
-    else:
-        st.warning("⚠️ Não foi possível carregar os dados de Recursos. Verifique sua conexão ou permissões.")
-
-# Se rodar este arquivo isoladamente (para testes)
-if __name__ == "__main__":
-    if 'usuario_logado' not in st.session_state:
-        st.session_state['usuario_logado'] = {'PLANO': 'DIAMANTE', 'local_liberado': 'TODOS'}
-    exibir_recursos()
+            st.warning("📍 Nenhum dado encontrado. Verifique se os nomes das cidades na planilha ID_LICENÇAS estão corretos (Ex: RIO DE JANE
