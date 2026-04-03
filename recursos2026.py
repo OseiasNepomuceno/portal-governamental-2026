@@ -59,7 +59,7 @@ def exibir_recursos():
             st.write(f"📍 **UF:** {uf_nome_completo}")
         st.divider()
 
-    # Termos desejados (Localidade tem prioridade sobre Município)
+    # Termos desejados para as colunas
     termos_desejados = ['ANO', 'TIPO', 'AUTOR', 'LOCALIDADE', 'UF', 'EMPENHADO', 'PAGO']
     lista_final = []
     
@@ -67,16 +67,17 @@ def exibir_recursos():
         reader = pd.read_csv(nome_arquivo, sep=None, engine='python', encoding='latin1', on_bad_lines='skip', chunksize=150000)
         
         for chunk in reader:
+            # Padroniza nomes de colunas
             chunk.columns = [str(c).upper().strip() for c in chunk.columns]
             
-            # 1. Filtro Ano 2026
+            # 1. FILTRO ANO 2026
             col_ano = next((c for c in chunk.columns if 'ANO' in c), None)
             if col_ano:
                 chunk = chunk[chunk[col_ano].astype(str).str.contains('2026', na=False)]
             
             if chunk.empty: continue
 
-            # 2. Filtro UF
+            # 2. FILTRO UF
             if not acesso_nacional:
                 col_uf_base = next((c for c in chunk.columns if c == 'UF'), None)
                 if col_uf_base:
@@ -84,10 +85,9 @@ def exibir_recursos():
 
             if chunk.empty: continue
 
-            # 3. Seleção de Colunas Limpas
+            # 3. SELEÇÃO DE COLUNAS
             cols_selecionadas = []
             for t in termos_desejados:
-                # Busca a coluna, ignorando códigos e IDs
                 encontrada = next((c for c in chunk.columns if t in c 
                                   and 'COD' not in c 
                                   and 'ID' not in c 
@@ -95,6 +95,37 @@ def exibir_recursos():
                 if encontrada:
                     cols_selecionadas.append(encontrada)
             
-            # Se a Localidade não foi encontrada, tenta Município como plano B
+            # Localidade como prioridade, Município como reserva
             if not any('LOCALIDADE' in c for c in cols_selecionadas):
-                reserva = next((c for c in chunk.columns if 'MUNICÍPIO' in c and 'COD' not
+                reserva = next((c for c in chunk.columns if 'MUNICÍPIO' in c and 'COD' not in c), None)
+                if reserva: cols_selecionadas.append(reserva)
+
+            if cols_selecionadas:
+                lista_final.append(chunk[list(dict.fromkeys(cols_selecionadas))].copy())
+
+        df_base = pd.concat(lista_final, ignore_index=True) if lista_final else pd.DataFrame()
+
+    except Exception as e:
+        st.error(f"Erro no processamento: {e}")
+        return
+
+    if df_base.empty:
+        st.warning(f"Sem dados para {uf_nome_completo} em 2026.")
+        return
+
+    # --- MÉTRICAS ---
+    col_p = next((c for c in df_base.columns if 'PAGO' in c), None)
+    col_e = next((c for c in df_base.columns if 'EMPENHADO' in c), None)
+
+    m1, m2 = st.columns(2)
+    label_local = "BRASIL" if acesso_nacional else uf_nome_completo
+    
+    if col_e:
+        v_e = df_base[col_e].apply(limpar_valor).sum()
+        m1.metric(f"Total Empenhado ({label_local})", f"R$ {v_e:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.'))
+    if col_p:
+        v_p = df_base[col_p].apply(limpar_valor).sum()
+        m2.metric(f"Total Pago ({label_local})", f"R$ {v_p:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.'))
+    
+    st.markdown("---") 
+    st.dataframe(df_base, use_container_width=True)
