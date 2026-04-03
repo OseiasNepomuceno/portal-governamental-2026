@@ -60,7 +60,7 @@ def tela_cadastro():
         st.session_state['tela'] = 'home'
         st.rerun()
 
-    # --- 1. SELEÇÃO DE PLANO (FORA DO FORMULÁRIO PARA SER INSTANTÂNEO) ---
+    # --- 1. SELEÇÃO DE PLANO (FORA DO FORMULÁRIO PARA ATUALIZAR NA HORA) ---
     opcoes_planos = {
         "BRONZE: Acesso a até 03 Municípios + 05 Revisões": "BRONZE",
         "PRATA: Acesso a 01 Estado completo + 15 Revisões": "PRATA",
@@ -68,7 +68,6 @@ def tela_cadastro():
         "DIAMANTE: Acesso Nacional (Brasil) + 200 Revisões": "DIAMANTE"
     }
     
-    # O usuário vê a descrição, mas o código guarda apenas o nome do plano (BRONZE, PRATA...)
     escolha_visual = st.selectbox("Selecione o Plano Desejado:", list(opcoes_planos.keys()))
     plano_final = opcoes_planos[escolha_visual]
 
@@ -76,51 +75,55 @@ def tela_cadastro():
     if plano_final == "BRONZE":
         label_local = "📍 Liste as 03 Cidades de Interesse"
         placeholder_local = "Ex: Presidente Prudente, Álvares Machado..."
-    elif plano_final == "PRATA":
-        label_local = "📍 Digite o Estado (UF) de Interesse"
-        placeholder_local = "Ex: São Paulo ou RJ"
-    elif plano_final == "OURO":
-        label_local = "📍 Liste os 03 Estados (UF) de Interesse"
+        tipo_consultor = "MUNICIPAL"
+    elif plano_final in ["PRATA", "OURO"]:
+        label_local = f"📍 Liste os Estados (UF) de Interesse"
         placeholder_local = "Ex: SP, RJ, MG"
+        tipo_consultor = "ESTADUAL"
     else:
         label_local = "📍 Localidade (Acesso Nacional Liberado)"
         placeholder_local = "Digite BRASIL ou deixe em branco"
+        tipo_consultor = "NACIONAL"
 
     # --- 3. FORMULÁRIO DE DADOS PESSOAIS ---
     with st.form("form_dados_pessoais"):
         nome = st.text_input("Nome Completo")
         email = st.text_input("E-mail (Seu futuro usuário)")
         senha = st.text_input("Crie uma Senha", type="password")
-        
-        # O campo de localidade agora usa a label dinâmica definida acima
         localidade = st.text_input(label_local, placeholder=placeholder_local)
         
-        st.warning(f"⚠️ Você está contratando o plano: **{plano_final}**")
+        st.warning(f"⚠️ Plano selecionado: **{plano_final}** ({tipo_consultor})")
         
         btn_enviar = st.form_submit_button("FINALIZAR CADASTRO E SOLICITAR ACESSO")
         
-       if btn_enviar:
+        if btn_enviar:
             if nome and email and senha:
-                # --- LÓGICA DO TIPO DE CONSULTOR ---
-                if plano_final == "BRONZE":
-                    tipo_consultor = "MUNICIPAL"
-                elif plano_final in ["PRATA", "OURO"]:
-                    tipo_consultor = "ESTADUAL"
-                else: # DIAMANTE
-                    tipo_consultor = "NACIONAL"
-
-                # --- ORDEM DAS COLUNAS (ALINHADA COM A PLANILHA) ---
-                # 1. usuario | 2. senha | 3. status | 4. plano | 5. tipo_consultor | 6. localidade
+                # Ordem das colunas: usuario, senha, status, plano, tipo_consultor, localidade
                 status_inicial = "pendente" 
                 
                 novo_usuario = [
-                    email,           # Coluna A: usuario
-                    senha,           # Coluna B: senha
-                    status_inicial,  # Coluna C: status
-                    plano_final,     # Coluna D: plano
-                    tipo_consultor,  # Coluna E: tipo_consultor (Dinâmico)
-                    localidade       # Coluna F: localidade/local_liberado
+                    email,           # Coluna A
+                    senha,           # Coluna B
+                    status_inicial,  # Coluna C
+                    plano_final,     # Coluna D
+                    tipo_consultor,  # Coluna E
+                    localidade       # Coluna F
                 ]
+                
+                if salvar_cadastro_google_sheets(novo_usuario):
+                    st.success("✅ Solicitação enviada com sucesso!")
+                    
+                    # Notificação por E-mail (Aviso para o Oseias)
+                    enviar_aviso_email(nome, plano_final, email)
+                    
+                    # Link para o WhatsApp
+                    link_zap = gerar_link_whatsapp(nome, plano_final)
+                    st.info("Para agilizar sua liberação, clique abaixo:")
+                    st.link_button("📱 AVISAR NO WHATSAPP", link_zap)
+                else:
+                    st.error("Erro técnico ao salvar na planilha.")
+            else:
+                st.error("Por favor, preencha Nome, E-mail e Senha.")
                 
                 if salvar_cadastro_google_sheets(novo_usuario):
                     st.success("✅ Solicitação enviada com sucesso!")
