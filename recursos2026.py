@@ -1,8 +1,14 @@
-# Arquivo Restaurado e Blindado - Core Essence - 03/04/2026
+# Arquivo Finalizado - Core Essence - Match Flexível - 03/04/2026
 import streamlit as st
 import pandas as pd
 import gdown
 import os
+import unicodedata
+
+def normalizar(texto):
+    if pd.isna(texto) or texto is None: return ""
+    nfkd = unicodedata.normalize('NFKD', str(texto).strip().upper())
+    return "".join([c for c in nfkd if not unicodedata.combining(c)])
 
 def limpar_valor_monetario(v):
     if pd.isna(v) or str(v).strip() in ["", "0"]: return 0.0
@@ -21,55 +27,42 @@ def exibir_recursos():
         with st.spinner("Sincronizando base de dados..."):
             gdown.download(f'https://drive.google.com/uc?id={file_id}', nome_arquivo, quiet=True)
 
-    # --- RECAPTURANDO O USUÁRIO (COM REDE DE SEGURANÇA) ---
     usuario = st.session_state.get('usuario_logado')
-    
     if not usuario:
-        st.error("⚠️ Sessão expirada ou usuário não logado.")
+        st.error("Usuário não identificado.")
         return
 
-    # Tenta pegar as cidades de qualquer jeito (vários nomes possíveis)
-    locais_bruto = (
-        usuario.get('local_liberado') or 
-        usuario.get('LOCAL_LIBERADO') or 
-        usuario.get('cidades') or 
-        usuario.get('municipios') or ""
-    )
-    
+    # 1. PREPARAÇÃO DOS TERMOS (SEM ACENTO PARA BUSCA INTERNA)
+    locais_bruto = usuario.get('local_liberado') or usuario.get('LOCAL_LIBERADO') or ""
+    # Transformamos NITERÓI em NITEROI para a busca no motor
+    termos_busca = [normalizar(c) for c in str(locais_bruto).split(',') if c.strip()]
     plano = str(usuario.get('PLANO', 'BRONZE')).upper()
-    
-    # Prepara a lista de busca (Como você colocou acentos na planilha, vamos usar exatamente o que vier)
-    locais_limpos = [c.strip().upper() for c in str(locais_bruto).split(',') if c.strip()]
-
-    # --- SE A LISTA CONTINUAR VAZIA, PARAMOS AQUI PARA VOCÊ VER O PORQUÊ ---
-    if not locais_limpos and plano not in ["OURO", "ADMIN"]:
-        st.error("❌ Erro de Configuração: Não encontramos cidades liberadas no seu perfil.")
-        with st.expander("Clique aqui para ver os dados do seu Login (Debug)"):
-            st.write("Estes são os dados que o sistema recebeu do seu login:")
-            st.json(usuario)
-            st.info("Verifique se o nome da coluna na sua planilha de usuários é exatamente 'local_liberado'")
-        return
 
     lista_pedacos = []
     
     try:
         status = st.empty()
-        # Lendo em pedaços (Chunks) para não dar erro de memória (400MB)
+        # Lendo em pedaços para não travar a memória
         reader = pd.read_csv(nome_arquivo, sep=None, engine='python', encoding='latin1', 
-                             on_bad_lines='skip', chunksize=60000)
+                             on_bad_lines='skip', chunksize=65000)
         
         for i, chunk in enumerate(reader):
-            status.info(f"Processando bloco {i+1}...")
-            chunk.columns = [str(c).upper().strip() for c in chunk.columns]
+            status.info(f"Vasculhando base de dados... Parte {i+1}")
             
+            # Padroniza colunas
+            chunk.columns = [normalizar(c) for c in chunk.columns]
             col_mun = next((c for c in chunk.columns if 'MUNICI' in c), None)
 
             if col_mun:
-                # Busca por aproximação (Igual ontem à noite)
-                if plano in ["BRONZE", "PRATA"]:
-                    padrao = '|'.join(locais_limpos)
-                    # Filtra se o nome da cidade no CSV CONTÉM algum dos seus locais
-                    chunk_f = chunk[chunk[col_mun].astype(str).str.upper().str.contains(padrao, na=False)].copy()
+                # Criamos uma versão da coluna MUNICIPIO sem acentos apenas para o filtro
+                # Isso garante que NITEROI (seu login) ache NITERÓI (no CSV)
+                chunk['MUN_LIMPO'] = chunk[col_mun].astype(str).apply(normalizar)
+                
+                if "BRONZE" in plano or "PRATA" in plano:
+                    # O pulo do gato: Regex que ignora o que vem antes ou depois
+                    # Ex: Se buscar 'NITEROI', ele acha 'PREFEITURA DE NITERÓI'
+                    padrao_regex = '|'.join(termos_busca)
+                    chunk_f = chunk[chunk['MUN_LIMPO'].str.contains(padrao_regex, na=False, case=False)].copy()
                 else:
                     chunk_f = chunk.copy()
 
@@ -80,17 +73,28 @@ def exibir_recursos():
         df_base = pd.concat(lista_pedacos, ignore_index=True) if lista_pedacos else pd.DataFrame()
 
     except Exception as e:
-        st.error(f"Erro técnico ao ler o CSV: {e}")
+        st.error(f"Erro ao ler os dados: {e}")
         return
 
-    # --- EXIBIÇÃO FINAL ---
+    # 2. EXIBIÇÃO DOS RESULTADOS
     if df_base.empty:
-        st.warning(f"Nenhum dado encontrado no CSV para: {locais_limpos}")
+        st.warning(f"Nenhum dado encontrado para: {termos_busca}")
+        st.info("Dica: Certifique-se de que o arquivo CSV no Drive contém dados dessas cidades.")
         return
 
     col_valor = next((c for c in df_base.columns if 'VALOR' in c), None)
     if col_valor:
         df_base['VALOR_NUM'] = df_base[col_valor].apply(limpar_valor_monetario)
 
-    st.metric("Total dos Recursos", f"R$ {df_base['VALOR_NUM'].sum():,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.'))
-    st.dataframe(df_base.drop(columns=['VALOR_NUM'], errors='ignore'), use_container_width=True)
+    # Dashboard
+    st.metric("Total dos Recursos Localizados", f"R$ {df_base['VALOR_NUM'].sum():,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.'))
+    
+    # Busca manual na tela
+    busca_tela = st.text_input("Refinar busca nos resultados (Ex: Saúde, Educação):")
+    if busca_tela:
+        termo_tela = normalizar(busca_tela)
+        mask = df_base.astype(str).apply(lambda x: x.str.upper().str.contains(termo_tela)).any(axis=1)
+        df_base = df_base[mask]
+
+    # Mostra a tabela limpa
+    st.dataframe(df_base.drop(columns=['MUN_LIMPO', 'VALOR_NUM'], errors='ignore'), use_container_width=True)
