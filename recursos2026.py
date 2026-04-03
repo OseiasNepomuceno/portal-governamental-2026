@@ -34,6 +34,20 @@ def exibir_recursos():
         st.error("Usuário não logado.")
         return
 
+    # --- IDENTIFICAÇÃO DO USUÁRIO NO MENU LATERAL ---
+    with st.sidebar:
+        st.divider()
+        st.markdown("### 👤 Identificação")
+        
+        # Tenta buscar o nome ou login do dicionário do usuário
+        nome_display = usuario.get('NOME') or usuario.get('USUARIO') or "Usuário"
+        st.info(f"**Login:** {nome_display}")
+        
+        # Exibe o Plano
+        plano_display = str(usuario.get('PLANO', 'BRONZE')).upper()
+        st.success(f"**Plano:** {plano_display}")
+        st.divider()
+
     # CONFIGURAÇÃO DE COLUNAS (Foco em nomes, sem códigos)
     alvos = ['ANO DA EMENDA', 'TIPO DA EMENDA', 'AUTOR', 'MUNICÍPIO', 'UF', 'EMPENHADO', 'LIQUIDADO', 'PAGO']
 
