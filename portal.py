@@ -8,9 +8,11 @@ import smtplib
 from email.mime.text import MIMEText
 import urllib.parse
 from google.oauth2.service_account import Credentials
-import radar  # Módulo Radar
-import recursos  # Módulo Recursos
-import revisao   # Módulo Revisão
+
+# Importação dos módulos customizados
+import radar    # radar.py
+import recursos # recursos.py
+import revisao  # revisao.py
 
 # --- 1. FUNÇÕES DE APOIO (CONEXÃO GOOGLE E NOTIFICAÇÕES) ---
 
@@ -151,13 +153,19 @@ def executar():
             plano = st.session_state.get('usuario_plano', 'BRONZE')
             usuario_atual = st.session_state.get('usuario_nome')
             st.info(f"🏆 Plano: {plano}")
+            
+            # Definição do Menu
             menu = ["📊 Recursos", "🏛️ Radar de Emendas", "📜 Revisão"]
-            if usuario_atual == "oseiasnepom@gmail.com": menu.append("🔧 Gestão Admin")
+            if usuario_atual == "oseiasnepom@gmail.com": 
+                menu.append("🔧 Gestão Admin")
             menu.append("🚪 Sair")
+            
             escolha = st.radio("Módulos:", menu)
 
+        # Lógica de Exibição dos Módulos
         if escolha == "🚪 Sair":
-            st.session_state.clear(); st.rerun()
+            st.session_state.clear()
+            st.rerun()
         
         elif escolha == "🔧 Gestão Admin":
             st.subheader("🔧 Painel de Controle - Administrador")
@@ -182,7 +190,8 @@ def executar():
                 st.markdown("---")
                 st.write("### Lista Geral")
                 st.dataframe(df_gestao)
-            except Exception as e: st.error(f"Erro: {e}")
+            except Exception as e: 
+                st.error(f"Erro na gestão: {e}")
 
         elif escolha == "🏛️ Radar de Emendas":
             radar.exibir_radar()
@@ -191,4 +200,8 @@ def executar():
             recursos.exibir_recursos() 
 
         elif escolha == "📜 Revisão":
-            revisao.exibir_
+            revisao.exibir_revisao()
+
+# --- INICIALIZAÇÃO ---
+if __name__ == "__main__":
+    executar()
