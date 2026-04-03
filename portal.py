@@ -8,9 +8,9 @@ import smtplib
 from email.mime.text import MIMEText
 import urllib.parse
 from google.oauth2.service_account import Credentials
-import radar  # Certifique-se de que o radar.py está na mesma pasta
-import recursos  # Adicione este
-import revisao   # Adicione este
+import radar  # Módulo Radar
+import recursos  # Módulo Recursos
+import revisao   # Módulo Revisão
 
 # --- 1. FUNÇÕES DE APOIO (CONEXÃO GOOGLE E NOTIFICAÇÕES) ---
 
@@ -55,7 +55,6 @@ def autenticar_usuario(usuario_digitado, senha_digitada):
         gdown.download(url, nome_arquivo, quiet=True)
         df = pd.read_excel(nome_arquivo, sheet_name='usuario')
         
-        # Normalização para garantir que 'LOCALIDADE' seja lida corretamente
         df.columns = [str(c).strip().upper() for c in df.columns]
         
         user_row = df[(df['USUARIO'].astype(str).str.strip() == str(usuario_digitado).strip()) & 
@@ -64,7 +63,6 @@ def autenticar_usuario(usuario_digitado, senha_digitada):
         if not user_row.empty:
             dados = user_row.iloc[0]
             if str(dados.get('STATUS', 'pendente')).lower().strip() == 'ativo':
-                # MAPEAMENTO PARA O RADAR: LOCALIDADE vira local_liberado
                 info_usuario = dados.to_dict()
                 info_usuario['local_liberado'] = dados.get('LOCALIDADE', '')
                 
@@ -121,7 +119,6 @@ def executar():
 
     if not st.session_state['logado']:
         if st.session_state['tela'] == 'home':
-            # --- RESTAURAÇÃO DO VISUAL ORIGINAL ---
             st.markdown("<h1 style='text-align: center;'>🛰️ Core Essence</h1>", unsafe_allow_html=True)
             st.markdown("<h3 style='text-align: center; color: #555;'>Inteligência Governamental Estratégica</h3>", unsafe_allow_html=True)
             st.write("\n")
@@ -163,7 +160,6 @@ def executar():
             st.session_state.clear(); st.rerun()
         
         elif escolha == "🔧 Gestão Admin":
-            # --- RESTAURAÇÃO DA GESTÃO ADMINISTRATIVA 100% ---
             st.subheader("🔧 Painel de Controle - Administrador")
             try:
                 scope = ["https://www.googleapis.com/auth/spreadsheets", "https://www.googleapis.com/auth/drive"]
@@ -192,15 +188,7 @@ def executar():
             radar.exibir_radar()
             
         elif escolha == "📊 Recursos":
-            # Aqui chamamos o arquivo recursos.py
             recursos.exibir_recursos() 
 
         elif escolha == "📜 Revisão":
-            # Aqui chamamos o arquivo revisao.py
-            revisao.exibir_revisao()
-
-        elif escolha == "🔧 Gestão Admin":
-            # ... seu código de gestão admin ...
-
-if __name__ == "__main__":
-    executar()
+            revisao.exibir_
