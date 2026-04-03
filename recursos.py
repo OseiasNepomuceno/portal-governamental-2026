@@ -1,10 +1,9 @@
-# Arquivo: recursos.py - Atualizado com Ajuste de Match em 03/04/2026
+# Arquivo: recursos.py - Versão Estável 03/04/2026
 import streamlit as st
 import pandas as pd
 import gdown
 import os
 
-# --- FUNÇÃO DE LIMPEZA MONETÁRIA ---
 def limpar_valor_monetario(v):
     if pd.isna(v) or str(v).strip() == "" or str(v).strip() == "0":
         return 0.0
@@ -20,7 +19,7 @@ def carregar_dados_recursos():
     file_id = st.secrets.get("file_id_convenios")
     
     if not file_id:
-        st.error("ERRO: file_id_convenios não configurado nos Secrets.")
+        st.error("ERRO: file_id_convenios não configurado.")
         return pd.DataFrame()
 
     url = f'https://drive.google.com/uc?id={file_id}'
@@ -44,7 +43,7 @@ def carregar_dados_recursos():
         
         return df
     except Exception as e:
-        st.error(f"Erro ao processar base de Recursos: {e}")
+        st.error(f"Erro ao processar base: {e}")
         return pd.DataFrame()
 
 def exibir_recursos():
@@ -53,7 +52,6 @@ def exibir_recursos():
     df_base = carregar_dados_recursos()
 
     if not df_base.empty:
-        # --- FILTRO DE SEGURANÇA POR PLANO ---
         usuario = st.session_state.get('usuario_logado')
         
         if usuario:
@@ -63,15 +61,9 @@ def exibir_recursos():
             col_uf = 'UF'
             col_mun = 'NOME MUNICÍPIO'
 
-            # --- [AJUSTE DE MATCH] NORMALIZAÇÃO PARA PLANO BRONZE ---
             if "BRONZE" in plano_user and col_mun in df_base.columns:
-                # Limpa e normaliza a lista de cidades permitidas da planilha
                 cidades_permitidas = [c.strip().upper() for c in local_liberado.split(',')]
-                
-                # Garante que a coluna do banco de dados também esteja limpa e em caixa alta
                 df_base[col_mun] = df_base[col_mun].fillna('').astype(str).str.strip().upper()
-                
-                # Filtra apenas as cidades que batem exatamente com a lista normalizada
                 df_base = df_base[df_base[col_mun].isin(cidades_permitidas)]
                 
             elif "PRATA" in plano_user and col_uf in df_base.columns:
@@ -82,7 +74,6 @@ def exibir_recursos():
                 estados_permitidos = [e.strip().upper() for e in local_liberado.split(',')]
                 df_base = df_base[df_base[col_uf].str.strip().upper().isin(estados_permitidos)]
 
-        # --- MAPEAMENTO E FILTROS INTERATIVOS ---
         col_valor = next((c for c in df_base.columns if 'VALOR' in c), None)
         col_ano = 'ANO_FILTRO' if 'ANO_FILTRO' in df_base.columns else None
         col_uf = 'UF' if 'UF' in df_base.columns else None
@@ -91,17 +82,16 @@ def exibir_recursos():
             df_base['VALOR_NUM'] = df_base[col_valor].apply(limpar_valor_monetario)
 
         st.markdown("### 🔍 Filtros de Análise")
-        termo = st.text_input("Busca por Palavra-Chave (Favorecido ou Objeto):").upper()
+        termo = st.text_input("Busca por Palavra-Chave:").upper()
         
         f1, f2 = st.columns(2)
         with f1:
             opcoes_ano = ["Todos"] + sorted(df_base[col_ano].unique().tolist(), reverse=True) if col_ano else ["Todos"]
-            filtro_ano = st.selectbox("Filtrar Ano:", opcoes_ano, key="rec_ano")
+            filtro_ano = st.selectbox("Filtrar Ano:", opcoes_ano)
         with f2:
             opcoes_uf = ["Todos"] + sorted(df_base[col_uf].dropna().unique().astype(str).tolist()) if col_uf else ["Todos"]
-            filtro_uf = st.selectbox("Filtrar Estado:", opcoes_uf, key="rec_uf")
+            filtro_uf = st.selectbox("Filtrar Estado:", opcoes_uf)
 
-        # Lógica de Filtragem Final
         df_f = df_base
         if termo:
             mask = df_f.astype(str).apply(lambda x: x.str.contains(termo, case=False)).any(axis=1)
@@ -111,19 +101,25 @@ def exibir_recursos():
         if filtro_uf != "Todos":
             df_f = df_f[df_f[col_uf] == filtro_uf]
 
-        # --- MÉTRICAS COM SEGURANÇA ---
         st.markdown("---")
         m1, m2 = st.columns(2)
         
         if 'VALOR_NUM' in df_f.columns and not df_f.empty:
             total = df_f['VALOR_NUM'].sum()
-            valor_formatado = f"R$ {total:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
-            m1.metric("Volume de Recursos", valor_formatado)
+            valor_fmt = f"R$ {total:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+            m1.metric("Volume de Recursos", valor_fmt)
         else:
             m1.metric("Volume de Recursos", "R$ 0,00")
             
         m2.metric("Resultados Encontrados", len(df_f))
 
-        # --- EXIBIÇÃO ---
         if df_f.empty:
-            st.warning("📍 Nenhum dado encontrado. Verifique se os nomes das cidades na planilha ID_LICENÇAS estão corretos (Ex: RIO DE JANE
+            st.warning("📍 Nenhum dado encontrado. Verifique os nomes das cidades.")
+        else:
+            st.dataframe(df_f.head(300), use_container_width=True)
+            
+    else:
+        st.warning("⚠️ Base de dados não carregada.")
+
+if __name__ == "__main__":
+    exibir_recursos()
