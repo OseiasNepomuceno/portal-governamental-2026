@@ -33,6 +33,7 @@ def exibir_dashboard_boas_vindas(nome, plano, uso_revisor):
             """, unsafe_allow_html=True
         )
 
+    # Limites atualizados para 15 e 10
     limite_revisoes = 15 if plano == "PREMIUM" else 10
     with col2:
         st.markdown(
@@ -106,8 +107,11 @@ def autenticar_usuario(usuario_digitado, senha_digitada):
         if os.path.exists(nome_arquivo): os.remove(nome_arquivo)
         gdown.download(url, nome_arquivo, quiet=True)
         df = pd.read_excel(nome_arquivo, sheet_name='usuario')
+        
+        # Limpeza de nomes de colunas
         df.columns = [str(c).strip().upper() for c in df.columns]
         
+        # Filtro de usuário e senha
         user_row = df[(df['USUARIO'].astype(str).str.strip() == str(usuario_digitado).strip()) & 
                       (df['SENHA'].astype(str).str.strip() == str(senha_digitada).strip())]
         
@@ -115,8 +119,11 @@ def autenticar_usuario(usuario_digitado, senha_digitada):
             dados = user_row.iloc[0]
             if str(dados.get('STATUS', 'pendente')).lower().strip() == 'ativo':
                 info_usuario = dados.to_dict()
-                info_usuario['PLANO'] = str(dados.get('PLANO', 'BRONZE')).upper().strip()
-                info_usuario['REVISOES_USADAS'] = dados.get('REVISOES_USADAS', 0)
+                info_usuario['PLANO'] = str(dados.get('PLANO', 'BÁSICO')).upper().strip()
+                
+                # BUSCA O SALDO NA COLUNA 6 (Índice 5 no DataFrame se for a 6ª coluna)
+                # Como usamos df.iloc[0], acessamos pelo nome da coluna que o Pandas mapeou
+                info_usuario['REVISOES_USADAS'] = dados.iloc[5] if len(dados) >= 6 else 0
                 
                 st.session_state['usuario_logado'] = info_usuario
                 st.session_state['logado'] = True
@@ -133,7 +140,7 @@ def autenticar_usuario(usuario_digitado, senha_digitada):
 # --- 3. CONFIGURAÇÃO DA PÁGINA ---
 st.set_page_config(page_title="Core Essence | Inteligência Governamental", page_icon="🛰️", layout="wide")
 
-# --- 4. TELA DE CADASTRO (LÓGICA DE LIMPEZA APLICADA) ---
+# --- 4. TELA DE CADASTRO ---
 def tela_cadastro():
     st.markdown("<h2 style='text-align: center; color: #28a745;'>🚀 Iniciar Nova Consultoria Especializada</h2>", unsafe_allow_html=True)
     
@@ -142,7 +149,6 @@ def tela_cadastro():
         "PREMIUM": "https://mpago.la/2CUKQgx"
     }
 
-    # LÓGICA DE LIMPEZA AO VOLTAR
     if st.button("⬅️ Voltar para o Início"):
         for chave in ['cadastro_concluido', 'plano_selecionado', 'nome_temp']:
             if chave in st.session_state:
@@ -200,7 +206,8 @@ def tela_cadastro():
             
             if enviado:
                 if nome and email and senha:
-                    sucesso = salvar_cadastro_google_sheets([email, senha, 'pendente', plano_f, 'CONSULTOR', local])
+                    # Incluindo o '0' inicial para a coluna de REVISOES_USADAS (Coluna 6)
+                    sucesso = salvar_cadastro_google_sheets([email, senha, 'pendente', plano_f, 'CONSULTOR', 0, local])
                     if sucesso:
                         enviar_aviso_email(nome, plano_f, email)
                         st.session_state['cadastro_concluido'] = True
@@ -215,7 +222,6 @@ def tela_cadastro():
         
         st.link_button(f"💳 CLIQUE AQUI PARA PAGAR", links_pagamento.get(st.session_state['plano_selecionado'], ""), use_container_width=True)
         
-        # NOVA LÓGICA: BOTÃO PARA LIMPAR TUDO E VOLTAR APÓS PAGAMENTO
         if st.button("Finalizei o Pagamento / Voltar ao Início"):
             for chave in ['cadastro_concluido', 'plano_selecionado', 'nome_temp']:
                 if chave in st.session_state:
@@ -295,9 +301,11 @@ def executar():
         with st.sidebar:
             st.title("Core Essence")
             usuario_atual = st.session_state.get('usuario_nome', 'Consultor').upper()
-            plano_atual = st.session_state.get('usuario_plano', 'BRONZE').upper()
+            plano_atual = st.session_state.get('usuario_plano', 'BÁSICO').upper()
             info_user = st.session_state.get('usuario_logado', {})
-            local = info_user.get('LOCALIDADE') or info_user.get('LOCAL_LIBERADO') or "RJ"
+            
+            # Localidade
+            local = info_user.get('LOCALIDADE') or info_user.get('LOCAL_LIBERADO') or "BR"
 
             st.info(f"👤 **LOGIN:** {usuario_atual}")
             st.success(f"🏆 **PLANO:** {plano_atual}")
@@ -312,6 +320,7 @@ def executar():
             escolha = st.radio("Módulos:", menu)
 
         if escolha == "🏠 Home":
+            # Pega o saldo atualizado da sessão
             uso_rev = info_user.get('REVISOES_USADAS', 0)
             exibir_dashboard_boas_vindas(usuario_atual, plano_atual, uso_rev)
         elif escolha == "🚪 Sair":
