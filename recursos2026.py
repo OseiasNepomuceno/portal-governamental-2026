@@ -3,7 +3,7 @@ import pandas as pd
 import gdown
 import os
 
-# Dicionário de tradução para exibição e filtros
+# Tradução para interface e filtros
 DE_PARA_UF = {
     'AC': 'ACRE', 'AL': 'ALAGOAS', 'AP': 'AMAPA', 'AM': 'AMAZONAS', 'BA': 'BAHIA',
     'CE': 'CEARA', 'DF': 'DISTRITO FEDERAL', 'ES': 'ESPIRITO SANTO', 'GO': 'GOIAS',
@@ -18,7 +18,6 @@ def limpar_valor(v):
     if pd.isna(v) or str(v).strip() in ["", "0"]: 
         return 0.0
     try:
-        # Padronização financeira para cálculo: R$ 1.234,56 -> 1234.56
         v = str(v).upper().replace('R$', '').replace(' ', '').replace('.', '').replace(',', '.').strip()
         return float(v)
     except: 
@@ -27,11 +26,13 @@ def limpar_valor(v):
 def exibir_recursos():
     st.title("📊 Radar de Recursos 2026")
     
+    # Busca o ID correto que você acabou de ajustar no Secrets
     file_id = st.secrets.get("file_id_convenios")
     nome_arquivo = "20260320_Convenios.csv"
 
+    # Se o arquivo local for o antigo, ele será substituído pelo novo do Drive
     if not os.path.exists(nome_arquivo):
-        with st.spinner("Sincronizando Base de Dados Nacional..."):
+        with st.spinner("Sincronizando Nova Base de Recursos..."):
             url = f'https://drive.google.com/uc?id={file_id}'
             gdown.download(url, nome_arquivo, quiet=False, fuzzy=True)
 
@@ -40,16 +41,15 @@ def exibir_recursos():
         st.error("Usuário não logado.")
         return
 
-    # --- LÓGICA DE PERMISSÃO ---
+    # --- LÓGICA DE USUÁRIO ---
     nome_usuario = str(usuario.get('NOME') or usuario.get('USUARIO') or "Consultor").upper()
     plano = str(usuario.get('PLANO', 'BÁSICO')).upper()
     uf_sigla = str(usuario.get('UF_LIBERADA') or usuario.get('UF') or "").strip().upper()
     
     uf_nome_completo = DE_PARA_UF.get(uf_sigla, uf_sigla)
-    # Plano Premium ou UF marcada como BRASIL libera visão nacional
     acesso_nacional = (plano == "PREMIUM" or uf_sigla == "BRASIL")
 
-    # --- INTERFACE LATERAL ---
+    # --- SIDEBAR ---
     with st.sidebar:
         st.divider()
         st.markdown("### 👤 Área do Consultor")
@@ -59,11 +59,11 @@ def exibir_recursos():
             label_scope = "BRASIL"
         else:
             st.warning(f"💼 **PLANO:** BÁSICO (ESTADUAL)")
-            st.write(f"📍 **UF LIBERADA:** {uf_nome_completo}")
+            st.write(f"📍 **UF:** {uf_nome_completo}")
             label_scope = uf_nome_completo
         st.divider()
 
-    # Colunas conforme diagnóstico exato
+    # Colunas que definimos para a Planilha de Recursos
     colunas_finais = [
         "Ano da Emenda", 
         "Tipo de Emenda", 
@@ -78,7 +78,7 @@ def exibir_recursos():
     lista_final = []
     
     try:
-        # Lendo em blocos com o motor Python para evitar erro de 'low_memory'
+        # Leitura otimizada para a nova base
         reader = pd.read_csv(
             nome_arquivo, 
             sep=None, 
@@ -89,20 +89,20 @@ def exibir_recursos():
         )
         
         for chunk in reader:
-            # 1. Filtro de Ano (Sempre 2026)
+            # 1. Filtro Ano 2026
             if "Ano da Emenda" in chunk.columns:
                 chunk = chunk[chunk["Ano da Emenda"].astype(str).str.contains('2026', na=False)]
             
             if chunk.empty: continue
 
-            # 2. Filtro de Abrangência (Plano Básico vs Premium)
+            # 2. Filtro Localidade (Plano Básico)
             if not acesso_nacional:
                 col_loc = "Localidade de aplicação do recurso"
                 col_uf = "UF"
-                # Busca textual para garantir que pegue cidades do estado (Ex: "RJ")
-                condicao_loc = chunk[col_loc].astype(str).str.upper().str.contains(uf_sigla, na=False)
-                condicao_uf = chunk[col_uf].astype(str).str.upper() == uf_nome_completo
-                chunk = chunk[condicao_loc | condicao_uf]
+                # Verifica se a sigla (ex: RJ) está na localidade ou na coluna UF
+                cond_loc = chunk[col_loc].astype(str).str.upper().str.contains(uf_sigla, na=False)
+                cond_uf = chunk[col_uf].astype(str).str.upper() == uf_nome_completo
+                chunk = chunk[cond_loc | cond_uf]
 
             if chunk.empty: continue
 
@@ -113,17 +113,16 @@ def exibir_recursos():
         df_base = pd.concat(lista_final, ignore_index=True) if lista_final else pd.DataFrame()
 
     except Exception as e:
-        st.error(f"Erro na leitura dos dados: {e}")
+        st.error(f"Erro na leitura da nova base: {e}")
         return
 
     if df_base.empty:
-        st.warning(f"Nenhum dado de 2026 encontrado para {label_scope}.")
+        st.warning(f"Nenhum recurso de 2026 encontrado para {label_scope}.")
         return
 
-    # --- MÉTRICAS DE RESUMO ---
+    # --- MÉTRICAS ---
     m1, m2, m3 = st.columns(3)
     
-    # Cálculos financeiros
     v_e = df_base["Valor Empenhado"].apply(limpar_valor).sum() if "Valor Empenhado" in df_base.columns else 0
     v_l = df_base["Valor Liquidado"].apply(limpar_valor).sum() if "Valor Liquidado" in df_base.columns else 0
     v_p = df_base["Valor Pago"].apply(limpar_valor).sum() if "Valor Pago" in df_base.columns else 0
@@ -133,7 +132,5 @@ def exibir_recursos():
     m3.metric("Total Pago", f"R$ {v_p:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.'))
     
     st.markdown("---") 
-    st.write(f"Exibindo **{len(df_base)}** registros encontrados (**{label_scope}**).")
-    
-    # Exibição da Planilha
+    st.write(f"Exibindo **{len(df_base)}** registros de recursos encontrados.")
     st.dataframe(df_base, use_container_width=True)
