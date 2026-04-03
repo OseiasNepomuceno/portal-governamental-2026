@@ -23,7 +23,6 @@ def registrar_log_acesso(nome, email, plano):
         if os.path.exists(nome_da_chave):
             creds = Credentials.from_service_account_file(nome_da_chave, scopes=scope)
             client = gspread.authorize(creds)
-            # Abre a planilha e a aba 'logs' (Certifique-se que essa aba existe no seu Google Sheets)
             planilha = client.open("ID_LICENÇAS").worksheet("logs")
             data_hora = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
             planilha.append_row([data_hora, nome, email, plano])
@@ -80,15 +79,12 @@ def autenticar_usuario(usuario_digitado, senha_digitada):
                 info_usuario = dados.to_dict()
                 info_usuario['PLANO'] = str(dados.get('PLANO', 'BRONZE')).upper().strip()
                 
-                # SESSÃO ATUALIZADA
                 st.session_state['usuario_logado'] = info_usuario
                 st.session_state['logado'] = True
                 st.session_state['usuario_nome'] = str(dados.get('USUARIO', ''))
                 st.session_state['usuario_plano'] = info_usuario['PLANO']
                 
-                # --- REGISTRO DE LOG AO AUTENTICAR ---
                 registrar_log_acesso(st.session_state['usuario_nome'], usuario_digitado, info_usuario['PLANO'])
-                
                 return True
         return False
     except Exception as e:
@@ -183,15 +179,24 @@ def executar():
         # --- ÁREA LOGADA ---
         with st.sidebar:
             st.title("Core Essence")
-            usuario_atual = st.session_state.get('usuario_nome', 'Consultor')
             
-            # --- CORREÇÃO SOLICITADA: LOGIN: USUARIO_LOGADO ---
-            st.info(f"👤 **LOGIN:** {usuario_atual.upper()}")
-            st.success(f"🏆 **PLANO:** {st.session_state.get('usuario_plano', 'BRONZE')}")
+            # Dados do Usuário
+            usuario_atual = st.session_state.get('usuario_nome', 'Consultor').upper()
+            plano_atual = st.session_state.get('usuario_plano', 'BRONZE').upper()
+            info_user = st.session_state.get('usuario_logado', {})
+            
+            # Recupera Localidade (Estado)
+            local = info_user.get('LOCALIDADE') or info_user.get('LOCAL_LIBERADO') or "RJ"
+
+            # EXIBIÇÃO ORGANIZADA
+            st.info(f"👤 **LOGIN:** {usuario_atual}")
+            st.success(f"🏆 **PLANO:** {plano_atual}")
+            st.warning(f"📍 **LOCAL:** {str(local).upper()}")
+            
+            st.divider()
             
             menu = ["📊 Recursos 2026", "🏛️ Radar de Emendas", "📜 Revisor de Estatuto"]
             
-            # Acesso Admin para o seu e-mail
             if usuario_atual.lower() == "oseiasnepom@gmail.com":
                 menu.append("🔧 Gestão Admin")
             
@@ -216,12 +221,11 @@ def executar():
                     scope = ["https://www.googleapis.com/auth/spreadsheets", "https://www.googleapis.com/auth/drive"]
                     creds = Credentials.from_service_account_file('ponto-facial-oseiascarveng-cd7b1ab54295.json', scopes=scope)
                     client = gspread.authorize(creds)
-                    # Lê os logs direto da planilha
                     df_logs = pd.DataFrame(client.open("ID_LICENÇAS").worksheet("logs").get_all_records())
                     st.write("### Histórico de Acessos Recentes")
                     st.dataframe(df_logs, use_container_width=True)
                 except:
-                    st.warning("Crie uma aba chamada 'logs' na sua planilha 'ID_LICENÇAS' para visualizar os dados.")
+                    st.warning("Verifique a aba 'logs' na sua planilha.")
 
 if __name__ == "__main__":
     executar()
