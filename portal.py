@@ -33,7 +33,8 @@ def exibir_dashboard_boas_vindas(nome, plano, uso_revisor):
             """, unsafe_allow_html=True
         )
 
-    limite_revisoes = 150 if plano == "PREMIUM" else 50
+    # Limites atualizados conforme nova estratégia de alto valor
+    limite_revisoes = 15 if plano == "PREMIUM" else 10
     with col2:
         st.markdown(
             f"""
@@ -133,13 +134,14 @@ def autenticar_usuario(usuario_digitado, senha_digitada):
 # --- 3. CONFIGURAÇÃO DA PÁGINA ---
 st.set_page_config(page_title="Core Essence | Inteligência Governamental", page_icon="🛰️", layout="wide")
 
-# --- 4. TELA DE CADASTRO (ATUALIZADA: BÁSICO ESTADUAL & PREMIUM NACIONAL) ---
+# --- 4. TELA DE CADASTRO (ATUALIZADA: ALTO VALOR E LOCALIZAÇÃO) ---
 def tela_cadastro():
-    st.markdown("<h2 style='text-align: center; color: #28a745;'>🚀 Iniciar Nova Consultoria</h2>", unsafe_allow_html=True)
+    st.markdown("<h2 style='text-align: center; color: #28a745;'>🚀 Iniciar Nova Consultoria Especializada</h2>", unsafe_allow_html=True)
     
+    # Lembre-se de atualizar esses links no Mercado Pago para os novos valores
     links_pagamento = {
-        "BÁSICO": "https://mpago.la/1gf9ryq", 
-        "PREMIUM": "https://mpago.la/2CUKQgx"
+        "BÁSICO": "https://mpago.la/1gf9ryq",  # R$ 1.250,00
+        "PREMIUM": "https://mpago.la/2CUKQgx"  # R$ 2.300,00
     }
 
     if st.button("⬅️ Voltar para o Início"):
@@ -151,26 +153,30 @@ def tela_cadastro():
         
         with col_p1:
             st.markdown("""
-                <div style="background-color: #f8f9fa; padding: 15px; border-radius: 10px; border-top: 5px solid #6c757d; min-height: 220px;">
-                    <h4 style="color: #495057; margin:0;">🌱 PLANO BÁSICO</h4>
-                    <p style="font-size: 13px; color: #666;">Essencial para monitoramento estadual.</p>
+                <div style="background-color: #f8f9fa; padding: 15px; border-radius: 10px; border-top: 5px solid #6c757d; min-height: 250px;">
+                    <h4 style="color: #495057; margin:0;">🌱 PLANO BÁSICO (ESTADUAL)</h4>
+                    <p style="font-size: 13px; color: #666;">Consultoria estratégica para atuação regional.</p>
+                    <h3 style="color: #333; margin-top: 5px;">R$ 1.250,00 <small style="font-size: 12px;">/mês</small></h3>
                     <ul style="font-size: 12px; color: #444;">
-                        <li><b>Radar de Emendas:</b> Inclui todas as cidades do estado escolhido</li>
+                        <li><b>Radar de Emendas:</b> Todo o estado escolhido</li>
                         <li>Monitoramento de Recursos 2026</li>
-                        <li>Até 50 Revisões de Estatuto por IA</li>
+                        <li><b>Até 10 Revisões de Estatuto por IA</b></li>
+                        <li>Suporte Técnico Especializado</li>
                     </ul>
                 </div>
             """, unsafe_allow_html=True)
             
         with col_p2:
             st.markdown("""
-                <div style="background-color: #e7f5ff; padding: 15px; border-radius: 10px; border-top: 5px solid #007bff; min-height: 220px;">
-                    <h4 style="color: #007bff; margin:0;">💎 PLANO PREMIUM</h4>
-                    <p style="font-size: 13px; color: #666;">Acesso total e inteligência avançada.</p>
+                <div style="background-color: #e7f5ff; padding: 15px; border-radius: 10px; border-top: 5px solid #007bff; min-height: 250px;">
+                    <h4 style="color: #007bff; margin:0;">💎 PLANO PREMIUM (NACIONAL)</h4>
+                    <p style="font-size: 13px; color: #666;">Inteligência de dados para escala nacional.</p>
+                    <h3 style="color: #007bff; margin-top: 5px;">R$ 2.300,00 <small style="font-size: 12px; color: #333;">/mês</small></h3>
                     <ul style="font-size: 12px; color: #444;">
-                        <li><b>Acesso Nacional:</b> Todos os estados e municípios do Brasil</li>
+                        <li><b>Acesso Nacional:</b> Todos os municípios e estados</li>
                         <li>Inteligência de Dados Prioritária</li>
-                        <li>Até 150 Revisões de Estatuto por IA</li>
+                        <li><b>Até 15 Revisões de Estatuto por IA</b></li>
+                        <li>Consultoria de Expansão de Recursos</li>
                     </ul>
                 </div>
             """, unsafe_allow_html=True)
@@ -178,8 +184,8 @@ def tela_cadastro():
         st.write("\n")
         
         opcoes = {
-            "PLANO BÁSICO (Monitoramento Estadual Completo)": "BÁSICO", 
-            "PLANO PREMIUM (Acesso Nacional + IA Avançada)": "PREMIUM"
+            "PLANO BÁSICO (Monitoramento Estadual - R$ 1.250,00)": "BÁSICO", 
+            "PLANO PREMIUM (Acesso Nacional - R$ 2.300,00)": "PREMIUM"
         }
         escolha_v = st.selectbox("Selecione o plano desejado:", list(opcoes.keys()))
         plano_f = opcoes[escolha_v]
@@ -189,7 +195,6 @@ def tela_cadastro():
             email = st.text_input("E-mail (Login)")
             senha = st.text_input("Senha", type="password")
             
-            # Campo atualizado com o placeholder conforme solicitado
             local = st.text_input(
                 "Local de Atuação", 
                 placeholder="Exemplo: para Plano Básico digite o seu Estado escolhido, para Plano Premium digite Nacional"
@@ -212,7 +217,7 @@ def tela_cadastro():
         st.success(f"✅ Cadastro recebido, {st.session_state['nome_temp']}!")
         st.write(f"Você selecionou o **PLANO {st.session_state['plano_selecionado']}**.")
         st.link_button(f"💳 PAGAR AGORA", links_pagamento.get(st.session_state['plano_selecionado'], ""), use_container_width=True)
-        st.info("Após o pagamento, seu acesso será liberado em até 30 min.")
+        st.info("Após o pagamento e confirmação bancária, seu acesso será liberado.")
 
 # --- 5. NAVEGAÇÃO E LÓGICA PRINCIPAL ---
 
