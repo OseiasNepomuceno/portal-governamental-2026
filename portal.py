@@ -9,6 +9,8 @@ from email.mime.text import MIMEText
 import urllib.parse
 from google.oauth2.service_account import Credentials
 
+st.write("O código está rodando!")
+
 # --- 1. FUNÇÕES DE APOIO (CONEXÃO GOOGLE E NOTIFICAÇÕES) ---
 
 def salvar_cadastro_google_sheets(dados_cliente):
