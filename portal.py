@@ -33,7 +33,6 @@ def exibir_dashboard_boas_vindas(nome, plano, uso_revisor):
             """, unsafe_allow_html=True
         )
 
-    # Limites atualizados para a estratégia de alto valor
     limite_revisoes = 15 if plano == "PREMIUM" else 10
     with col2:
         st.markdown(
@@ -134,16 +133,20 @@ def autenticar_usuario(usuario_digitado, senha_digitada):
 # --- 3. CONFIGURAÇÃO DA PÁGINA ---
 st.set_page_config(page_title="Core Essence | Inteligência Governamental", page_icon="🛰️", layout="wide")
 
-# --- 4. TELA DE CADASTRO (ATUALIZADA: ALTO VALOR E SEM SUPORTE/CONSULTORIA EXTRA) ---
+# --- 4. TELA DE CADASTRO (LÓGICA DE LIMPEZA APLICADA) ---
 def tela_cadastro():
     st.markdown("<h2 style='text-align: center; color: #28a745;'>🚀 Iniciar Nova Consultoria Especializada</h2>", unsafe_allow_html=True)
     
     links_pagamento = {
-        "BÁSICO": "https://mpago.la/1gf9ryq",  # R$ 1.250,00
-        "PREMIUM": "https://mpago.la/2CUKQgx"  # R$ 2.300,00
+        "BÁSICO": "https://mpago.la/1gf9ryq",
+        "PREMIUM": "https://mpago.la/2CUKQgx"
     }
 
+    # LÓGICA DE LIMPEZA AO VOLTAR
     if st.button("⬅️ Voltar para o Início"):
+        for chave in ['cadastro_concluido', 'plano_selecionado', 'nome_temp']:
+            if chave in st.session_state:
+                del st.session_state[chave]
         st.session_state['tela'] = 'home'
         st.rerun()
 
@@ -191,11 +194,7 @@ def tela_cadastro():
             nome = st.text_input("Nome Completo")
             email = st.text_input("E-mail (Login)")
             senha = st.text_input("Senha", type="password")
-            
-            local = st.text_input(
-                "Local de Atuação", 
-                placeholder="Exemplo: para Plano Básico digite o seu Estado escolhido, para Plano Premium digite Nacional"
-            )
+            local = st.text_input("Local de Atuação", placeholder="Ex: RJ ou Nacional")
             
             enviado = st.form_submit_button("PRÓXIMO PASSO: PAGAMENTO ➡️", use_container_width=True)
             
@@ -213,7 +212,17 @@ def tela_cadastro():
     else:
         st.success(f"✅ Cadastro recebido, {st.session_state['nome_temp']}!")
         st.write(f"Você selecionou o **PLANO {st.session_state['plano_selecionado']}**.")
-        st.link_button(f"💳 PAGAR AGORA", links_pagamento.get(st.session_state['plano_selecionado'], ""), use_container_width=True)
+        
+        st.link_button(f"💳 CLIQUE AQUI PARA PAGAR", links_pagamento.get(st.session_state['plano_selecionado'], ""), use_container_width=True)
+        
+        # NOVA LÓGICA: BOTÃO PARA LIMPAR TUDO E VOLTAR APÓS PAGAMENTO
+        if st.button("Finalizei o Pagamento / Voltar ao Início"):
+            for chave in ['cadastro_concluido', 'plano_selecionado', 'nome_temp']:
+                if chave in st.session_state:
+                    del st.session_state[chave]
+            st.session_state['tela'] = 'home'
+            st.rerun()
+
         st.info("Após o pagamento e confirmação bancária, seu acesso será liberado.")
 
 # --- 5. NAVEGAÇÃO E LÓGICA PRINCIPAL ---
@@ -285,7 +294,6 @@ def executar():
     else:
         with st.sidebar:
             st.title("Core Essence")
-            
             usuario_atual = st.session_state.get('usuario_nome', 'Consultor').upper()
             plano_atual = st.session_state.get('usuario_plano', 'BRONZE').upper()
             info_user = st.session_state.get('usuario_logado', {})
@@ -298,44 +306,34 @@ def executar():
             st.divider()
             
             menu = ["🏠 Home", "📊 Recursos 2026", "🏛️ Radar de Emendas", "📜 Revisor de Estatuto"]
-            
             if usuario_atual.lower() == "oseiasnepom@gmail.com":
                 menu.append("🔧 Gestão Admin")
-            
             menu.append("🚪 Sair")
             escolha = st.radio("Módulos:", menu)
 
         if escolha == "🏠 Home":
             uso_rev = info_user.get('REVISOES_USADAS', 0)
             exibir_dashboard_boas_vindas(usuario_atual, plano_atual, uso_rev)
-            
         elif escolha == "🚪 Sair":
             st.session_state.clear()
             st.rerun()
-            
         elif escolha == "🏛️ Radar de Emendas":
             radar_emendas_2026.exibir_radar()
-            
         elif escolha == "📊 Recursos 2026":
             recursos2026.exibir_recursos()
-            
         elif escolha == "📜 Revisor de Estatuto":
             revisor_estatuto.exibir_revisor()
-            
         elif escolha == "🔧 Gestão Admin":
             st.title("🔧 Painel de Gestão")
-            tab1, tab2 = st.tabs(["LOG_ACESSOS", "Configurações"])
-            
-            with tab1:
-                try:
-                    scope = ["https://www.googleapis.com/auth/spreadsheets", "https://www.googleapis.com/auth/drive"]
-                    creds = Credentials.from_service_account_file('ponto-facial-oseiascarveng-cd7b1ab54295.json', scopes=scope)
-                    client = gspread.authorize(creds)
-                    df_logs = pd.DataFrame(client.open("ID_LICENÇAS").worksheet("logs").get_all_records())
-                    st.write("### Histórico de Acessos Recentes")
-                    st.dataframe(df_logs, use_container_width=True)
-                except:
-                    st.warning("Verifique a aba 'logs' na sua planilha.")
+            try:
+                scope = ["https://www.googleapis.com/auth/spreadsheets", "https://www.googleapis.com/auth/drive"]
+                creds = Credentials.from_service_account_file('ponto-facial-oseiascarveng-cd7b1ab54295.json', scopes=scope)
+                client = gspread.authorize(creds)
+                df_logs = pd.DataFrame(client.open("ID_LICENÇAS").worksheet("logs").get_all_records())
+                st.write("### Histórico de Acessos Recentes")
+                st.dataframe(df_logs, use_container_width=True)
+            except:
+                st.warning("Verifique a aba 'logs' na sua planilha.")
 
 if __name__ == "__main__":
     executar()
