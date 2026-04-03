@@ -72,7 +72,7 @@ def exibir_recursos():
         local_liberado = str(usuario.get('local_liberado', '')).upper()
         
         if "BRONZE" in plano_user:
-            cidades_permitidas = [c.strip() for c in local_liberado.split(',')]
+            cidades_permitidas = [c.strip().upper() for c in local_liberado.split(',')]
             if col_mun in df_base.columns:
                 df_base[col_mun] = df_base[col_mun].fillna('').astype(str).str.upper()
                 df_base = df_base[df_base[col_mun].isin(cidades_permitidas)]
@@ -84,14 +84,16 @@ def exibir_recursos():
             st.sidebar.info(f"📍 Acesso Prata: Estado {local_liberado}.")
             
         elif "OURO" in plano_user:
-            estados_permitidos = [e.strip() for e in local_liberado.split(',')]
+            estados_permitidos = [e.strip().upper() for e in local_liberado.split(',')]
             if col_uf in df_base.columns:
                 df_base = df_base[df_base[col_uf].str.upper().isin(estados_permitidos)]
             st.sidebar.info(f"📍 Acesso Ouro: {len(estados_permitidos)} estados.")
 
-    # Conversão de valores
+    # Conversão de valores financeiros
     if col_valor:
         df_base['VALOR_NUM'] = df_base[col_valor].apply(limpar_valor_monetario)
+    else:
+        df_base['VALOR_NUM'] = 0.0
 
     # --- 2. INTERFACE DE FILTROS ---
     st.markdown("### 🔍 Busca e Filtros")
@@ -112,10 +114,17 @@ def exibir_recursos():
     if filtro_uf != "Todos":
         df_f = df_f[df_f[col_uf] == filtro_uf]
     if termo:
-        # Busca em todas as colunas de texto para facilitar para o consultor
         mask = df_f.astype(str).apply(lambda x: x.str.contains(termo, case=False)).any(axis=1)
         df_f = df_f[mask]
 
-    # --- 3. EXIBIÇÃO ---
-    st.metric("Total Encontrado", f"R$ {df_f['VALOR_NUM'].sum():,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.'))
-    st.dataframe(df_f, use_container_width=True)
+    # --- 3. EXIBIÇÃO SEGURA ---
+    st.markdown("---")
+    if not df_f.empty:
+        total_soma = df_f['VALOR_NUM'].sum()
+        total_formatado = f"R$ {total_soma:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.')
+        
+        st.metric("Total Encontrado", total_formatado)
+        st.dataframe(df_f, use_container_width=True)
+    else:
+        st.metric("Total Encontrado", "R$ 0,00")
+        st.warning("⚠️ Nenhum registro encontrado para os critérios selecionados.")
