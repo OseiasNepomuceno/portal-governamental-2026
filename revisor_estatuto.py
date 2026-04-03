@@ -6,21 +6,23 @@ import io
 
 def exibir_revisor():
     # --- 1. CAPTURA DADOS DO LOGIN JÁ EXISTENTE ---
-    # O sistema de login que você fez já salva o 'usuario_logado'
     usuario = st.session_state.get('usuario_logado', {})
     
     if not usuario:
         st.warning("⚠️ Por favor, realize o login para acessar o revisor.")
         return
 
-    email = usuario.get('usuario', 'Consultor')
-    plano = str(usuario.get('PLANO', 'BASICO')).upper()
+    email = usuario.get('USUARIO', 'Consultor') # Ajustado para bater com a chave em maiúsculo
+    plano = str(usuario.get('PLANO', 'BÁSICO')).upper().strip()
     
-    # Definindo limites baseados no seu modelo de negócio
-    limite = 150 if plano == "PREMIUM" else 50
+    # --- ATUALIZAÇÃO DOS LIMITES ESTRATÉGICOS ---
+    # Aceita 'BÁSICO' ou 'BASICO' para evitar erros de acentuação na planilha
+    if plano == "PREMIUM":
+        limite = 15
+    else:
+        limite = 10
 
-    # Recupera o contador que já deve estar na planilha ou na sessão
-    # Se você já criou a coluna REVISOES_USADAS na planilha de licenças:
+    # Recupera o contador de revisões usadas
     uso_atual = usuario.get('REVISOES_USADAS', 0)
 
     # --- INTERFACE ---
@@ -28,7 +30,7 @@ def exibir_revisor():
     with col_t:
         st.header("📜 Revisor de Estatuto 33/2023")
     with col_st:
-        # Mostra o medidor de progresso/uso
+        # Mostra o medidor de progresso/uso atualizado
         st.metric("Saldo de Revisões", f"{uso_atual}/{limite}")
 
     # --- 2. TRAVA DE SEGURANÇA ---
@@ -44,20 +46,20 @@ def exibir_revisor():
         # Extração e Botão de Análise
         if st.button("🚀 Iniciar Análise Estratégica"):
             with st.spinner("O Consultor IA está analisando..."):
-                # Aqui você chama a sua função de análise do Gemini
-                # ... (lógica de extração e API Gemini) ...
+                # --- ESPAÇO PARA CHAMADA DA API GEMINI ---
+                # (Aqui entra sua lógica de extração de texto e prompt)
+                # -----------------------------------------
                 
-                # SUCESSO NA ANÁLISE:
-                # Importante: Para persistir na planilha, você precisa dar um 
-                # update no dataframe original que foi carregado no login.
-                
+                # SIMULAÇÃO DE SUCESSO NA ANÁLISE:
                 uso_atual += 1
+                
+                # Atualiza o estado da sessão para refletir no portal principal imediatamente
                 st.session_state.usuario_logado['REVISOES_USADAS'] = uso_atual
                 
                 st.success(f"✅ Revisão concluída! Novo saldo: {uso_atual}/{limite}")
                 
-                # Se o seu sistema tiver uma função 'salvar_dados()', chame-a aqui
-                # para enviar o novo valor de volta ao Google Drive.
+                # DICA: Para que esse número persista no Google Sheets, você precisará
+                # criar uma função para dar 'update' na célula da planilha 'usuario'.
                 
                 st.rerun()
 
