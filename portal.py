@@ -15,6 +15,50 @@ import revisor_estatuto
 
 # --- 2. FUNÇÕES DE APOIO ---
 
+def exibir_dashboard_boas_vindas(nome, plano, uso_revisor):
+    """Exibe os 03 cards de boas-vindas no topo da área logada"""
+    st.markdown(f"### 👋 Bem-vindo, {nome.split('@')[0].capitalize()}!")
+    
+    col1, col2, col3 = st.columns(3)
+    
+    # Card 1: Radar de Emendas
+    with col1:
+        st.markdown(
+            f"""
+            <div style="background-color: #f0f2f6; padding: 20px; border-radius: 10px; border-left: 5px solid #007bff; min-height: 150px;">
+                <h4 style="margin: 0; color: #007bff;">📊 Radar 2026</h4>
+                <p style="font-size: 14px; color: #555; margin-top: 10px;">Acompanhamento estratégico de emendas e recursos governamentais.</p>
+                <span style="background: #007bff; color: white; padding: 2px 8px; border-radius: 5px; font-size: 12px;">ATIVO</span>
+            </div>
+            """, unsafe_allow_html=True
+        )
+
+    # Card 2: Revisor (Dinâmico com Limites)
+    limite_revisoes = 150 if plano == "PREMIUM" else 50
+    with col2:
+        st.markdown(
+            f"""
+            <div style="background-color: #f0f2f6; padding: 20px; border-radius: 10px; border-left: 5px solid #28a745; min-height: 150px;">
+                <h4 style="margin: 0; color: #28a745;">📑 Revisor IA</h4>
+                <p style="font-size: 14px; color: #555; margin-top: 10px;">Análise de conformidade de estatutos via Gemini 1.5 Flash.</p>
+                <small>Uso: <b>{uso_revisor}/{limite_revisoes}</b></small>
+            </div>
+            """, unsafe_allow_html=True
+        )
+
+    # Card 3: Status da Licença
+    with col3:
+        st.markdown(
+            f"""
+            <div style="background-color: #f0f2f6; padding: 20px; border-radius: 10px; border-left: 5px solid #ffc107; min-height: 150px;">
+                <h4 style="margin: 0; color: #856404;">🏆 Plano {plano}</h4>
+                <p style="font-size: 14px; color: #555; margin-top: 10px;">Sua licença de consultor está ativa e vinculada ao curso SENAI IA.</p>
+                <small>Expiração: <b>31/12/2026</b></small>
+            </div>
+            """, unsafe_allow_html=True
+        )
+    st.divider()
+
 def registrar_log_acesso(nome, email, plano):
     """Grava o histórico de acessos na aba 'logs' da planilha Google Sheets"""
     scope = ["https://www.googleapis.com/auth/spreadsheets", "https://www.googleapis.com/auth/drive"]
@@ -33,9 +77,6 @@ def salvar_cadastro_google_sheets(dados_cliente):
     scope = ["https://www.googleapis.com/auth/spreadsheets", "https://www.googleapis.com/auth/drive"]
     try:
         nome_da_chave = 'ponto-facial-oseiascarveng-cd7b1ab54295.json'
-        if not os.path.exists(nome_da_chave):
-            st.error(f"Arquivo de credenciais {nome_da_chave} não encontrado.")
-            return False
         creds = Credentials.from_service_account_file(nome_da_chave, scopes=scope)
         client = gspread.authorize(creds)
         planilha = client.open("ID_LICENÇAS").worksheet("usuario")
@@ -78,6 +119,8 @@ def autenticar_usuario(usuario_digitado, senha_digitada):
             if str(dados.get('STATUS', 'pendente')).lower().strip() == 'ativo':
                 info_usuario = dados.to_dict()
                 info_usuario['PLANO'] = str(dados.get('PLANO', 'BRONZE')).upper().strip()
+                # Pega revisões usadas (se a coluna existir)
+                info_usuario['REVISOES_USADAS'] = dados.get('REVISOES_USADAS', 0)
                 
                 st.session_state['usuario_logado'] = info_usuario
                 st.session_state['logado'] = True
@@ -195,7 +238,7 @@ def executar():
             
             st.divider()
             
-            menu = ["📊 Recursos 2026", "🏛️ Radar de Emendas", "📜 Revisor de Estatuto"]
+            menu = ["🏠 Home", "📊 Recursos 2026", "🏛️ Radar de Emendas", "📜 Revisor de Estatuto"]
             
             if usuario_atual.lower() == "oseiasnepom@gmail.com":
                 menu.append("🔧 Gestão Admin")
@@ -203,15 +246,25 @@ def executar():
             menu.append("🚪 Sair")
             escolha = st.radio("Módulos:", menu)
 
-        if escolha == "🚪 Sair":
+        # LÓGICA DE EXIBIÇÃO DE CONTEÚDO
+        if escolha == "🏠 Home":
+            # Exibe os Cards de Boas-Vindas
+            uso_rev = info_user.get('REVISOES_USADAS', 0)
+            exibir_dashboard_boas_vindas(usuario_atual, plano_atual, uso_rev)
+            
+        elif escolha == "🚪 Sair":
             st.session_state.clear()
             st.rerun()
+            
         elif escolha == "🏛️ Radar de Emendas":
             radar_emendas_2026.exibir_radar()
+            
         elif escolha == "📊 Recursos 2026":
             recursos2026.exibir_recursos()
+            
         elif escolha == "📜 Revisor de Estatuto":
             revisor_estatuto.exibir_revisor()
+            
         elif escolha == "🔧 Gestão Admin":
             st.title("🔧 Painel de Gestão")
             tab1, tab2 = st.tabs(["LOG_ACESSOS", "Configurações"])
