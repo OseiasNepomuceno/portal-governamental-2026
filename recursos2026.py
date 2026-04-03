@@ -1,8 +1,18 @@
-# Arquivo Atualizado com Filtro de Segurança e Resiliência de Colunas - 03/04/2026
+# Arquivo Atualizado - Normalização de Acentos e Case - 03/04/2026
 import streamlit as st
 import pandas as pd
 import gdown
 import os
+import unicodedata
+
+# --- FUNÇÃO DE NORMALIZAÇÃO (REMOVE ACENTOS E ESPAÇOS) ---
+def normalizar_texto(texto):
+    if pd.isna(texto):
+        return ""
+    # Remove acentos, espaços extras e coloca em MAIÚSCULO
+    nfkd_form = unicodedata.normalize('NFKD', str(texto))
+    texto_sem_acento = "".join([c for c in nfkd_form if not unicodedata.combining(c)])
+    return texto_sem_acento.strip().upper()
 
 # --- FUNÇÃO DE LIMPEZA MONETÁRIA ---
 def limpar_valor_monetario(v):
@@ -48,45 +58,41 @@ def exibir_recursos():
         st.warning("A base de dados está vazia ou não foi carregada.")
         return
 
-    # --- MAPEAMENTO DINÂMICO DE COLUNAS ---
-    # Busca por UF
+    # --- MAPEAMENTO DE COLUNAS ---
     col_uf = next((c for c in df_base.columns if c == 'UF' or 'ESTADO' in c), "UF")
-    
-    # Busca por Município (Tenta várias combinações comuns em portais governamentais)
-    col_mun = next((c for c in df_base.columns if any(p in c for p in ['MUNICI', 'CIDADE', 'LOCALIDADE', 'BENEFICIARIO'])), None)
-    
+    col_mun = next((c for c in df_base.columns if 'MUNICI' in c or 'CIDADE' in c), None)
     col_valor = next((c for c in df_base.columns if 'VALOR' in c), None)
     col_ano = 'ANO_FILTRO'
 
-    # --- 1. FILTRO DE SEGURANÇA POR PLANO ---
+    # --- 1. FILTRO DE SEGURANÇA POR PLANO COM NORMALIZAÇÃO ---
     usuario = st.session_state.get('usuario_logado')
     
     if usuario and col_mun:
         plano_user = str(usuario.get('PLANO', 'BRONZE')).upper()
-        local_liberado = str(usuario.get('local_liberado', '')).upper()
+        local_liberado = str(usuario.get('local_liberado', ''))
         
-        # Limpa e separa a lista de cidades da planilha
-        cidades_permitidas = [c.strip() for c in local_liberado.split(',') if c.strip()]
+        # Normaliza a lista de cidades da planilha (Ex: "Niterói" vira "NITEROI")
+        cidades_permitidas = [normalizar_texto(c) for c in local_liberado.split(',') if c.strip()]
         
         if "BRONZE" in plano_user:
-            # Garante que a coluna do CSV seja tratada como string antes do strip/upper
-            df_base[col_mun] = df_base[col_mun].astype(str).str.strip().upper()
-            df_base = df_base[df_base[col_mun].isin(cidades_permitidas)]
+            # Normaliza a coluna do CSV para bater com a lista
+            df_base['MUN_NORMALIZADO'] = df_base[col_mun].apply(normalizar_texto)
+            df_base = df_base[df_base['MUN_NORMALIZADO'].isin(cidades_permitidas)]
+            
             st.sidebar.warning(f"📍 Acesso Bronze: {len(cidades_permitidas)} cidades.")
+            st.sidebar.write(f"Cidades Ativas: {', '.join(cidades_permitidas)}")
             
         elif "PRATA" in plano_user:
-            if col_uf in df_base.columns:
-                df_base = df_base[df_base[col_uf].astype(str).str.strip().upper() == local_liberado.strip()]
-            st.sidebar.info(f"📍 Acesso Prata: Estado {local_liberado}.")
+            estado_alvo = normalizar_texto(local_liberado)
+            df_base['UF_NORMALIZADA'] = df_base[col_uf].apply(normalizar_texto)
+            df_base = df_base[df_base['UF_NORMALIZADA'] == estado_alvo]
+            st.sidebar.info(f"📍 Acesso Prata: Estado {estado_alvo}.")
             
         elif "OURO" in plano_user:
-            estados_permitidos = [e.strip() for e in local_liberado.split(',') if e.strip()]
-            if col_uf in df_base.columns:
-                df_base = df_base[df_base[col_uf].astype(str).str.strip().upper().isin(estados_permitidos)]
+            estados_permitidos = [normalizar_texto(e) for e in local_liberado.split(',') if e.strip()]
+            df_base['UF_NORMALIZADA'] = df_base[col_uf].apply(normalizar_texto)
+            df_base = df_base[df_base['UF_NORMALIZADA'].isin(estados_permitidos)]
             st.sidebar.info(f"📍 Acesso Ouro: {len(estados_permitidos)} estados.")
-    else:
-        if not col_mun:
-            st.error("⚠️ Coluna de Município não encontrada no CSV. Verifique os nomes das colunas.")
 
     # Conversão de valores financeiros
     if col_valor:
@@ -96,7 +102,10 @@ def exibir_recursos():
 
     # --- 2. INTERFACE DE FILTROS ---
     st.markdown("### 🔍 Busca e Filtros")
-    termo = st.text_input("Busca por Favorecido ou Objeto:").upper()
+    termo = st.text_input("Busca por Favorecido ou Objeto:")
+    
+    # Normaliza o termo de busca para a pesquisa ser ampla
+    termo_norm = normalizar_texto(termo)
     
     c1, c2 = st.columns(2)
     with c1:
@@ -104,25 +113,4 @@ def exibir_recursos():
         filtro_ano = st.selectbox("Ano:", opcoes_ano)
     with c2:
         opcoes_uf = ["Todos"] + sorted(df_base[col_uf].dropna().unique().astype(str).tolist())
-        filtro_uf = st.selectbox("Estado (UF):", opcoes_uf)
-
-    # Aplicação dos Filtros
-    df_f = df_base.copy()
-    if filtro_ano != "Todos":
-        df_f = df_f[df_f[col_ano] == filtro_ano]
-    if filtro_uf != "Todos":
-        df_f = df_f[df_f[col_uf] == filtro_uf]
-    if termo:
-        mask = df_f.astype(str).apply(lambda x: x.str.contains(termo, case=False)).any(axis=1)
-        df_f = df_f[mask]
-
-    # --- 3. EXIBIÇÃO ---
-    st.markdown("---")
-    if not df_f.empty:
-        total_soma = df_f['VALOR_NUM'].sum()
-        total_formatado = f"R$ {total_soma:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.')
-        st.metric("Total Encontrado", total_formatado)
-        st.dataframe(df_f, use_container_width=True)
-    else:
-        st.metric("Total Encontrado", "R$ 0,00")
-        st.warning("⚠️ Nenhum registro encontrado.")
+        filtro_uf = st.selectbox("Estado (UF):", opcoes
