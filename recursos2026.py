@@ -26,13 +26,12 @@ def limpar_valor(v):
 def exibir_recursos():
     st.title("📊 Radar de Recursos 2026")
     
-    # Busca o ID correto que você acabou de ajustar no Secrets
     file_id = st.secrets.get("file_id_convenios")
-    nome_arquivo = "20260320_Convenios.csv"
+    # NOME AJUSTADO COM ACENTO CONFORME O DRIVE
+    nome_arquivo = "20260320_Convênios.csv"
 
-    # Se o arquivo local for o antigo, ele será substituído pelo novo do Drive
     if not os.path.exists(nome_arquivo):
-        with st.spinner("Sincronizando Nova Base de Recursos..."):
+        with st.spinner("Sincronizando Base de Recursos do Drive..."):
             url = f'https://drive.google.com/uc?id={file_id}'
             gdown.download(url, nome_arquivo, quiet=False, fuzzy=True)
 
@@ -44,7 +43,7 @@ def exibir_recursos():
     # --- LÓGICA DE USUÁRIO ---
     nome_usuario = str(usuario.get('NOME') or usuario.get('USUARIO') or "Consultor").upper()
     plano = str(usuario.get('PLANO', 'BÁSICO')).upper()
-    uf_sigla = str(usuario.get('UF_LIBERADA') or usuario.get('UF') or "").strip().upper()
+    uf_sigla = str(usuario.get('UF_LIBERADA') or usuario.get('UF') or "RJ").strip().upper()
     
     uf_nome_completo = DE_PARA_UF.get(uf_sigla, uf_sigla)
     acesso_nacional = (plano == "PREMIUM" or uf_sigla == "BRASIL")
@@ -63,7 +62,7 @@ def exibir_recursos():
             label_scope = uf_nome_completo
         st.divider()
 
-    # Colunas que definimos para a Planilha de Recursos
+    # Colunas esperadas na planilha de recursos
     colunas_finais = [
         "Ano da Emenda", 
         "Tipo de Emenda", 
@@ -78,7 +77,7 @@ def exibir_recursos():
     lista_final = []
     
     try:
-        # Leitura otimizada para a nova base
+        # Leitura com engine python para suportar acentuação no nome do arquivo e encoding latin1
         reader = pd.read_csv(
             nome_arquivo, 
             sep=None, 
@@ -99,7 +98,6 @@ def exibir_recursos():
             if not acesso_nacional:
                 col_loc = "Localidade de aplicação do recurso"
                 col_uf = "UF"
-                # Verifica se a sigla (ex: RJ) está na localidade ou na coluna UF
                 cond_loc = chunk[col_loc].astype(str).str.upper().str.contains(uf_sigla, na=False)
                 cond_uf = chunk[col_uf].astype(str).str.upper() == uf_nome_completo
                 chunk = chunk[cond_loc | cond_uf]
@@ -113,11 +111,11 @@ def exibir_recursos():
         df_base = pd.concat(lista_final, ignore_index=True) if lista_final else pd.DataFrame()
 
     except Exception as e:
-        st.error(f"Erro na leitura da nova base: {e}")
+        st.error(f"Erro na leitura do arquivo '{nome_arquivo}': {e}")
         return
 
     if df_base.empty:
-        st.warning(f"Nenhum recurso de 2026 encontrado para {label_scope}.")
+        st.warning(f"Nenhum registro de 2026 encontrado para {label_scope}.")
         return
 
     # --- MÉTRICAS ---
@@ -132,5 +130,5 @@ def exibir_recursos():
     m3.metric("Total Pago", f"R$ {v_p:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.'))
     
     st.markdown("---") 
-    st.write(f"Exibindo **{len(df_base)}** registros de recursos encontrados.")
+    st.write(f"Exibindo **{len(df_base)}** registros encontrados.")
     st.dataframe(df_base, use_container_width=True)
