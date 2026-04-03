@@ -33,7 +33,7 @@ def exibir_dashboard_boas_vindas(nome, plano, uso_revisor):
             """, unsafe_allow_html=True
         )
 
-    # Limites atualizados conforme nova estratégia de alto valor
+    # Limites atualizados para a estratégia de alto valor
     limite_revisoes = 15 if plano == "PREMIUM" else 10
     with col2:
         st.markdown(
@@ -134,11 +134,10 @@ def autenticar_usuario(usuario_digitado, senha_digitada):
 # --- 3. CONFIGURAÇÃO DA PÁGINA ---
 st.set_page_config(page_title="Core Essence | Inteligência Governamental", page_icon="🛰️", layout="wide")
 
-# --- 4. TELA DE CADASTRO (ATUALIZADA: ALTO VALOR E LOCALIZAÇÃO) ---
+# --- 4. TELA DE CADASTRO (ATUALIZADA: ALTO VALOR E SEM SUPORTE/CONSULTORIA EXTRA) ---
 def tela_cadastro():
     st.markdown("<h2 style='text-align: center; color: #28a745;'>🚀 Iniciar Nova Consultoria Especializada</h2>", unsafe_allow_html=True)
     
-    # Lembre-se de atualizar esses links no Mercado Pago para os novos valores
     links_pagamento = {
         "BÁSICO": "https://mpago.la/1gf9ryq",  # R$ 1.250,00
         "PREMIUM": "https://mpago.la/2CUKQgx"  # R$ 2.300,00
@@ -161,7 +160,6 @@ def tela_cadastro():
                         <li><b>Radar de Emendas:</b> Todo o estado escolhido</li>
                         <li>Monitoramento de Recursos 2026</li>
                         <li><b>Até 10 Revisões de Estatuto por IA</b></li>
-                        <li>Suporte Técnico Especializado</li>
                     </ul>
                 </div>
             """, unsafe_allow_html=True)
@@ -176,7 +174,6 @@ def tela_cadastro():
                         <li><b>Acesso Nacional:</b> Todos os municípios e estados</li>
                         <li>Inteligência de Dados Prioritária</li>
                         <li><b>Até 15 Revisões de Estatuto por IA</b></li>
-                        <li>Consultoria de Expansão de Recursos</li>
                     </ul>
                 </div>
             """, unsafe_allow_html=True)
