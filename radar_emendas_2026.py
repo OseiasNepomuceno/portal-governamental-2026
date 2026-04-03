@@ -26,7 +26,6 @@ def exibir_radar():
 
     # 3. LEITURA DA BASE (Resolve o erro: low_memory / engine python)
     try:
-        # Usamos engine='python' e sep=None para detectar automaticamente se é vírgula ou ponto-e-vírgula
         df = pd.read_csv(
             nome_arquivo, 
             sep=None, 
@@ -40,25 +39,37 @@ def exibir_radar():
 
     except Exception as e:
         st.error(f"Não foi possível carregar a base: Erro na leitura: {e}")
-        # Se der erro na leitura, removemos o arquivo possivelmente corrompido para tentar novo download depois
         if os.path.exists(nome_arquivo):
             os.remove(nome_arquivo)
         return
 
-    # 4. LÓGICA DE FILTROS POR PLANO E ESTADO
+    # 4. LÓGICA DE FILTROS POR PLANO E ESTADO (CORRIGIDA PARA EVITAR ATTRIBUTEERROR)
     usuario = st.session_state.get('usuario_logado', {})
     plano = str(usuario.get('PLANO', 'BRONZE')).upper()
     
-    # Recupera a localidade (ex: RJ) - prioriza o que vem do login
+    # Recupera a localidade do cadastro
     local_cadastrado = str(usuario.get('LOCALIDADE') or usuario.get('LOCAL_LIBERADO') or "RJ").strip().upper()
-    
-    # Verifica permissão de acesso nacional
     acesso_nacional = (plano in ["PREMIUM", "DIAMANTE", "OURO"])
 
-    if not acesso_nacional and "UF" in df.columns:
-        # Filtra a planilha para mostrar apenas o estado do consultor
-        df = df[df["UF"].astype(str).str.strip().upper() == local_cadastrado]
-        st.info(f"📍 Filtro Ativo: **{local_cadastrado}** (Plano {plano})")
+    # --- BUSCA AUTOMÁTICA PELA COLUNA DE UF ---
+    coluna_uf = None
+    possiveis_nomes = ["UF", "ESTADO", "SIGLA", "U.F.", "SG_UF"]
+    
+    for c in possiveis_nomes:
+        if c in df.columns:
+            coluna_uf = c
+            break
+
+    if not acesso_nacional:
+        if coluna_uf:
+            # Aplica o filtro na coluna encontrada
+            df = df[df[coluna_uf].astype(str).str.strip().upper() == local_cadastrado]
+            st.info(f"📍 Filtro Ativo: **{local_cadastrado}** (Coluna identificada: {coluna_uf})")
+        else:
+            # Caso não encontre nenhuma coluna de UF, avisa o usuário em vez de travar o app
+            st.warning("⚠️ Atenção: Não foi possível filtrar por Estado pois a coluna 'UF' ou 'ESTADO' não foi detectada na planilha.")
+            st.write("Colunas disponíveis na base:", list(df.columns))
+
     elif acesso_nacional:
         st.success(f"✅ Acesso Nacional Liberado (Plano {plano})")
 
@@ -68,8 +79,8 @@ def exibir_radar():
     else:
         st.write(f"Exibindo **{len(df)}** registros encontrados.")
         
-        # Formatação opcional: Se houver colunas de valor, tenta converter para exibição
-        colunas_valor = [c for c in df.columns if "VALOR" in c]
+        # Converte colunas de valor para numérico para evitar erros de exibição
+        colunas_valor = [c for c in df.columns if "VALOR" in c or "VAL" in c]
         for col in colunas_valor:
             df[col] = pd.to_numeric(df[col], errors='coerce').fillna(0)
 
