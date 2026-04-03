@@ -13,12 +13,17 @@ FONTES_DADOS = {
 def carregar_dados_drive(id_secret):
     file_id = st.secrets.get(id_secret)
     if not file_id: 
-        return None, f"Chave {id_secret} não configurada."
+        return None, f"Chave {id_secret} não configurada nos Secrets."
+    
     url = f'https://drive.google.com/uc?export=download&id={file_id}'
     output = f"{id_secret}.csv"
+    
     try:
-        gdown.download(url, output, quiet=True, fuzzy=True)
-        df = pd.read_csv(output, sep=';', encoding='latin1', on_bad_lines='skip', low_memory=False)
+        if not os.path.exists(output):
+            gdown.download(url, output, quiet=True, fuzzy=True)
+        
+        # Leitura flexível para evitar erros de separador
+        df = pd.read_csv(output, sep=None, engine='python', encoding='latin1', on_bad_lines='skip', low_memory=False)
         df.columns = [str(c).strip().upper() for c in df.columns]
         return df, "Sucesso"
     except Exception as e:
@@ -29,8 +34,9 @@ def formatar_brl(valor):
 
 def limpar_valor_monetario(v):
     if pd.isna(v) or v is None: return 0.0
-    v = str(v).replace('R$', '').replace('.', '').replace(',', '.').strip()
     try:
+        # Limpa R$, pontos e espaços para converter em float
+        v = str(v).upper().replace('R$', '').replace(' ', '').replace('.', '').replace(',', '.').strip()
         return float(v)
     except:
         return 0.0
@@ -54,79 +60,84 @@ def exibir_radar():
     with col_f1:
         fonte_sel = st.selectbox("Base de Dados:", list(FONTES_DADOS.keys()))
     with col_f2:
+        # Adicionado 2026 como padrão
         ano_sel = st.selectbox("Ano de Referência", [2026, 2025, 2024], index=0)
     with col_f3:
-        mes_sel = "Todos"
+        # Busca textual para facilitar a navegação
+        termo_busca = st.text_input("🔍 Buscar por Palavra-Chave:").upper()
 
     id_chave = FONTES_DADOS[fonte_sel]
     with st.spinner("🛰️ Sincronizando dados de alta volumetria..."):
         df_base, msg = carregar_dados_drive(id_chave)
     
     if df_base is not None:
-        C_UF = "UF"
-        C_MUN = "MUNICÍPIO"
-        C_ANO = "ANO DA EMENDA"
-        C_VALOR = "VALOR EMPENHADO"
-        C_AUTOR = "NOME DO AUTOR DA EMENDA"
+        # --- BUSCA DINÂMICA DE COLUNAS (Evita erro de nome exato) ---
+        C_UF = next((c for c in df_base.columns if c == 'UF' or 'ESTADO' in c), "UF")
+        C_MUN = next((c for c in df_base.columns if 'MUNICI' in c), "MUNICÍPIO")
+        C_ANO = next((c for c in df_base.columns if 'ANO' in c), "ANO DA EMENDA")
+        C_VALOR = next((c for c in df_base.columns if 'VALOR' in c and 'EMPENHADO' in c) or (c for c in df_base.columns if 'VALOR' in c), "VALOR EMPENHADO")
+        C_AUTOR = next((c for c in df_base.columns if 'AUTOR' in c or 'PARLAMENTAR' in c), "NOME DO AUTOR DA EMENDA")
 
-        # --- 1. LIMPEZA DE DADOS ---
+        # --- 1. LIMPEZA DE TERMOS NULOS ---
         termos_nulos = ["SEM INFORMAÇÃO", "SEM INFORMACAO", "NÃO INFORMADO", "NAN", "NONE", "0", "0.0"]
         for col in [C_UF, C_MUN, C_AUTOR]:
             if col in df_base.columns:
                 df_base[col] = df_base[col].astype(str).str.upper().str.strip()
-                df_base = df_base[~df_base[col].isin(termos_nulos)]
 
         # --- 2. TRAVA DE SEGURANÇA (BRONZE, PRATA E OURO) ---
         if local_liberado and local_liberado != "NAN" and "DIAMANTE" not in plano_user:
             locais = [l.strip().upper() for l in local_liberado.split(',')]
-            tradutor_uf = {"RJ": "RIO DE JANEIRO", "SP": "SÃO PAULO", "MG": "MINAS GERAIS"}
+            tradutor_uf = {"RJ": "RIO DE JANEIRO", "SP": "SÃO PAULO", "MG": "MINAS GERAIS", "PR": "PARANÁ"}
             
-            if "BRONZE" in plano_user:
-                if C_MUN in df_base.columns:
-                    df_base = df_base[df_base[C_MUN].isin(locais)]
-            elif "PRATA" in plano_user:
-                if C_UF in df_base.columns:
-                    uf_alvo = locais[0]
-                    nome_ext = tradutor_uf.get(uf_alvo, uf_alvo)
-                    df_base = df_base[(df_base[C_UF] == uf_alvo) | (df_base[C_UF] == nome_ext)]
-            elif "OURO" in plano_user:
-                if C_UF in df_base.columns:
-                    lista_extensa = [tradutor_uf.get(x, x) for x in locais]
-                    df_base = df_base[(df_base[C_UF].isin(locais)) | (df_base[C_UF].isin(lista_extensa))]
+            if "BRONZE" in plano_user and C_MUN in df_base.columns:
+                df_base = df_base[df_base[C_MUN].isin(locais)]
+            elif "PRATA" in plano_user and C_UF in df_base.columns:
+                uf_alvo = locais[0]
+                nome_ext = tradutor_uf.get(uf_alvo, uf_alvo)
+                df_base = df_base[(df_base[C_UF] == uf_alvo) | (df_base[C_UF] == nome_ext)]
+            elif "OURO" in plano_user and C_UF in df_base.columns:
+                lista_extensa = [tradutor_uf.get(x, x) for x in locais]
+                df_base = df_base[(df_base[C_UF].isin(locais)) | (df_base[C_UF].isin(lista_extensa))]
 
-        # --- 3. FILTRO DE ANO ---
+        # --- 3. FILTROS DE ANO E BUSCA ---
         if C_ANO in df_base.columns:
             df_base[C_ANO] = df_base[C_ANO].astype(str).str.strip().str.replace('.0', '', regex=False)
             df_final = df_base[df_base[C_ANO] == str(ano_sel)].copy()
         else:
             df_final = df_base.copy()
 
-        # --- 4. EXIBIÇÃO ---
-        col_v = C_VALOR if C_VALOR in df_final.columns else next((c for c in df_final.columns if "VALOR" in c), None)
+        if termo_busca:
+            mask = df_final.astype(str).apply(lambda x: x.str.contains(termo_busca, case=False)).any(axis=1)
+            df_final = df_final[mask]
 
-        if col_v:
-            df_final[col_v] = df_final[col_v].apply(limpar_valor_monetario)
-            
-            if not df_final.empty:
-                v_total = df_final[col_v].sum()
+        # --- 4. EXIBIÇÃO DE RESULTADOS ---
+        if not df_final.empty:
+            if C_VALOR in df_final.columns:
+                df_final[C_VALOR] = df_final[C_VALOR].apply(limpar_valor_monetario)
+                v_total = df_final[C_VALOR].sum()
                 st.metric(f"Total Identificado em {ano_sel}", formatar_brl(v_total))
                 
+                # Gráficos
                 col_g1, col_g2 = st.columns(2)
                 with col_g1:
                     if C_AUTOR in df_final.columns:
-                        st.write("📈 **Top Autores**")
-                        chart = df_final.groupby(C_AUTOR)[col_v].sum().sort_values(ascending=False).head(10)
+                        st.write("📈 **Top 10 Autores (R$)**")
+                        chart = df_final.groupby(C_AUTOR)[C_VALOR].sum().sort_values(ascending=False).head(10)
                         st.bar_chart(chart)
                 with col_g2:
                     if C_MUN in df_final.columns:
-                        st.write("📍 **Top Municípios**")
-                        chart_mun = df_final.groupby(C_MUN)[col_v].sum().sort_values(ascending=False).head(10)
+                        st.write("📍 **Top 10 Municípios (R$)**")
+                        chart_mun = df_final.groupby(C_MUN)[C_VALOR].sum().sort_values(ascending=False).head(10)
                         st.bar_chart(chart_mun)
 
-                # --- O PULO DO GATO PARA EVITAR O ERRO DE 200MB ---
-                st.markdown(f"📊 *Exibindo as primeiras 500 linhas de {len(df_final)} totais (Para performance).*")
+                st.markdown(f"📊 *Exibindo as primeiras 500 linhas de {len(df_final)} totais.*")
                 st.dataframe(df_final.head(500), use_container_width=True)
             else:
-                st.warning(f"Nenhum dado encontrado para {ano_sel}.")
+                st.error("Coluna de valor financeiro não identificada no arquivo.")
         else:
-            st.error("Coluna de valor financeiro não identificada.")
+            st.warning(f"Nenhum dado encontrado para os filtros selecionados em {ano_sel}.")
+    else:
+        st.error(f"Não foi possível carregar a base: {msg}")
+
+if __name__ == "__main__":
+    exibir_radar()
