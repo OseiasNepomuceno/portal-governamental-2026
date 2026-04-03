@@ -18,7 +18,7 @@ def limpar_valor(v):
     if pd.isna(v) or str(v).strip() in ["", "0"]: 
         return 0.0
     try:
-        # Padronização financeira para cálculo
+        # Padronização financeira para cálculo: R$ 1.234,56 -> 1234.56
         v = str(v).upper().replace('R$', '').replace(' ', '').replace('.', '').replace(',', '.').strip()
         return float(v)
     except: 
@@ -46,7 +46,7 @@ def exibir_recursos():
     uf_sigla = str(usuario.get('UF_LIBERADA') or usuario.get('UF') or "").strip().upper()
     
     uf_nome_completo = DE_PARA_UF.get(uf_sigla, uf_sigla)
-    # Define se o usuário tem visão total ou restrita
+    # Plano Premium ou UF marcada como BRASIL libera visão nacional
     acesso_nacional = (plano == "PREMIUM" or uf_sigla == "BRASIL")
 
     # --- INTERFACE LATERAL ---
@@ -63,7 +63,7 @@ def exibir_recursos():
             label_scope = uf_nome_completo
         st.divider()
 
-    # Colunas exatas do diagnóstico (Ordem de importância)
+    # Colunas conforme diagnóstico exato
     colunas_finais = [
         "Ano da Emenda", 
         "Tipo de Emenda", 
@@ -78,7 +78,15 @@ def exibir_recursos():
     lista_final = []
     
     try:
-        reader = pd.read_csv(nome_arquivo, sep=None, engine='python', encoding='latin1', on_bad_lines='skip', chunksize=200000)
+        # Lendo em blocos com o motor Python para evitar erro de 'low_memory'
+        reader = pd.read_csv(
+            nome_arquivo, 
+            sep=None, 
+            engine='python', 
+            encoding='latin1', 
+            on_bad_lines='skip', 
+            chunksize=150000
+        )
         
         for chunk in reader:
             # 1. Filtro de Ano (Sempre 2026)
@@ -87,25 +95,25 @@ def exibir_recursos():
             
             if chunk.empty: continue
 
-            # 2. Filtro de Abrangência (Se não for Premium, filtra por Estado)
+            # 2. Filtro de Abrangência (Plano Básico vs Premium)
             if not acesso_nacional:
                 col_loc = "Localidade de aplicação do recurso"
                 col_uf = "UF"
-                # Busca a sigla ou o nome do estado em qualquer uma das colunas de localização
+                # Busca textual para garantir que pegue cidades do estado (Ex: "RJ")
                 condicao_loc = chunk[col_loc].astype(str).str.upper().str.contains(uf_sigla, na=False)
                 condicao_uf = chunk[col_uf].astype(str).str.upper() == uf_nome_completo
                 chunk = chunk[condicao_loc | condicao_uf]
 
             if chunk.empty: continue
 
-            # 3. Seleção de Colunas Estratégicas
+            # 3. Seleção das Colunas
             cols_atuais = [c for c in colunas_finais if c in chunk.columns]
             lista_final.append(chunk[cols_atuais].copy())
 
         df_base = pd.concat(lista_final, ignore_index=True) if lista_final else pd.DataFrame()
 
     except Exception as e:
-        st.error(f"Erro técnico no processamento: {e}")
+        st.error(f"Erro na leitura dos dados: {e}")
         return
 
     if df_base.empty:
@@ -115,6 +123,7 @@ def exibir_recursos():
     # --- MÉTRICAS DE RESUMO ---
     m1, m2, m3 = st.columns(3)
     
+    # Cálculos financeiros
     v_e = df_base["Valor Empenhado"].apply(limpar_valor).sum() if "Valor Empenhado" in df_base.columns else 0
     v_l = df_base["Valor Liquidado"].apply(limpar_valor).sum() if "Valor Liquidado" in df_base.columns else 0
     v_p = df_base["Valor Pago"].apply(limpar_valor).sum() if "Valor Pago" in df_base.columns else 0
