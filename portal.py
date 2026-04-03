@@ -4,6 +4,7 @@ import gdown
 import os
 import gspread
 import smtplib
+import unicodedata
 from email.mime.text import MIMEText
 from google.oauth2.service_account import Credentials
 from datetime import datetime
@@ -21,7 +22,6 @@ def exibir_dashboard_boas_vindas(nome, plano, uso_revisor):
     
     col1, col2, col3 = st.columns(3)
     
-    # Card 1: Radar de Emendas
     with col1:
         st.markdown(
             f"""
@@ -33,7 +33,6 @@ def exibir_dashboard_boas_vindas(nome, plano, uso_revisor):
             """, unsafe_allow_html=True
         )
 
-    # Card 2: Revisor (Dinâmico com Limites)
     limite_revisoes = 150 if plano == "PREMIUM" else 50
     with col2:
         st.markdown(
@@ -46,7 +45,6 @@ def exibir_dashboard_boas_vindas(nome, plano, uso_revisor):
             """, unsafe_allow_html=True
         )
 
-    # Card 3: Status da Licença (AJUSTADO: 30 DIAS)
     with col3:
         st.markdown(
             f"""
@@ -60,7 +58,6 @@ def exibir_dashboard_boas_vindas(nome, plano, uso_revisor):
     st.divider()
 
 def registrar_log_acesso(nome, email, plano):
-    """Grava o histórico de acessos na aba 'logs' da planilha Google Sheets"""
     scope = ["https://www.googleapis.com/auth/spreadsheets", "https://www.googleapis.com/auth/drive"]
     try:
         nome_da_chave = 'ponto-facial-oseiascarveng-cd7b1ab54295.json'
@@ -189,22 +186,51 @@ def executar():
 
     if not st.session_state['logado']:
         if st.session_state['tela'] == 'home':
-            st.markdown("<h1 style='text-align: center;'>🛰️ Core Essence</h1>", unsafe_allow_html=True)
+            st.markdown("<h1 style='text-align: center; color: #007bff;'>🛰️ Core Essence</h1>", unsafe_allow_html=True)
             st.markdown("<h3 style='text-align: center;'>Inteligência Governamental Estratégica</h3>", unsafe_allow_html=True)
-            st.markdown("---")
-            c1, c2 = st.columns(2)
-            if c1.button("👤 LOGIN", use_container_width=True, type="primary"):
-                st.session_state['tela'] = 'login'
-                st.rerun()
-            if c2.button("🚀 CADASTRAR", use_container_width=True):
-                st.session_state['tela'] = 'cadastro'
-                st.rerun()
+            st.write("\n")
+
+            # --- CARDS DE ENTRADA (MERCADO E ACESSO) ---
+            col1, col2, col3 = st.columns(3)
+
+            with col1:
+                st.markdown("""
+                    <div style="background-color: #f8f9fa; padding: 20px; border-radius: 15px; border-top: 5px solid #007bff; min-height: 250px; text-align: center;">
+                        <h4 style="color: #007bff;">👤 Já é Cliente?</h4>
+                        <p style="font-size: 14px; color: #555;">Acesse sua área exclusiva para monitorar emendas e recursos em tempo real com dados atualizados.</p>
+                    </div>
+                """, unsafe_allow_html=True)
+                if st.button("FAZER LOGIN", use_container_width=True, type="primary"):
+                    st.session_state['tela'] = 'login'
+                    st.rerun()
+
+            with col2:
+                st.markdown("""
+                    <div style="background-color: #f8f9fa; padding: 20px; border-radius: 15px; border-top: 5px solid #28a745; min-height: 250px; text-align: center;">
+                        <h4 style="color: #28a745;">🚀 Seja Consultor</h4>
+                        <p style="font-size: 14px; color: #555;">Cadastre-se para utilizar nossas ferramentas de IA e transformar sua atuação parlamentar e governamental.</p>
+                    </div>
+                """, unsafe_allow_html=True)
+                if st.button("CRIAR CONTA / CADASTRAR", use_container_width=True):
+                    st.session_state['tela'] = 'cadastro'
+                    st.rerun()
+
+            with col3:
+                st.markdown("""
+                    <div style="background-color: #f8f9fa; padding: 20px; border-radius: 15px; border-top: 5px solid #ffc107; min-height: 250px; text-align: center;">
+                        <h4 style="color: #856404;">🛰️ Ecossistema</h4>
+                        <p style="font-size: 14px; color: #555;">A Core Essence une tecnologia de ponta e consultoria humana para garantir o sucesso na captação de recursos.</p>
+                    </div>
+                """, unsafe_allow_html=True)
+                st.info("💡 Consultoria + Tecnologia")
+
+            st.divider()
 
         elif st.session_state['tela'] == 'cadastro': 
             tela_cadastro()
             
         elif st.session_state['tela'] == 'login':
-            st.title("🔑 Acesso")
+            st.title("🔑 Acesso ao Portal")
             if st.button("⬅️ Voltar"): 
                 st.session_state['tela'] = 'home'
                 st.rerun()
