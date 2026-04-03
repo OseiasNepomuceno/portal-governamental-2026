@@ -188,7 +188,12 @@ def tela_cadastro():
             nome = st.text_input("Nome Completo")
             email = st.text_input("E-mail (Login)")
             senha = st.text_input("Senha", type="password")
-            local = st.text_input("Local de Atuação (UF no Básico ou NACIONAL no Premium)")
+            
+            # Campo atualizado com o placeholder conforme solicitado
+            local = st.text_input(
+                "Local de Atuação", 
+                placeholder="Exemplo: para Plano Básico digite o seu Estado escolhido, para Plano Premium digite Nacional"
+            )
             
             enviado = st.form_submit_button("PRÓXIMO PASSO: PAGAMENTO ➡️", use_container_width=True)
             
