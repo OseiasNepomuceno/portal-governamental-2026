@@ -135,6 +135,8 @@ def tela_cadastro():
 
 # --- 4. NAVEGAÇÃO E LÓGICA PRINCIPAL ---
 
+# --- 4. NAVEGAÇÃO E LÓGICA PRINCIPAL ---
+
 def executar():
     if 'logado' not in st.session_state:
         st.session_state['logado'] = False
@@ -143,15 +145,29 @@ def executar():
 
     if not st.session_state['logado']:
         if st.session_state['tela'] == 'home':
+            # TÍTULO PRINCIPAL
             st.markdown("<h1 style='text-align: center;'>🛰️ Core Essence</h1>", unsafe_allow_html=True)
-            st.markdown("<h3 style='text-align: center;'>Inteligência Governamental Estratégica</h3>", unsafe_allow_html=True)
+            st.markdown("<h3 style='text-align: center; color: #555;'>Inteligência Governamental Estratégica</h3>", unsafe_allow_html=True)
+            st.write("\n")
             
-            col1, col2 = st.columns(2)
-            with col1:
+            # --- OS 03 QUADROS DE MENSAGEM (REINSERIDOS AQUI) ---
+            c_f1, c_f2, c_f3 = st.columns(3)
+            with c_f1:
+                st.info("**Para nossos Consultores:**\n\n*Bem-vindo de volta ao centro da estratégia. Acesse seus dados abaixo.*")
+            with c_f2:
+                st.success("**Para novos Membros:**\n\n*Transforme dados governamentais em faturamento real com nossa IA.*")
+            with c_f3:
+                st.warning("**Por que Core Essence?**\n\n*Não apenas monitore recursos, antecipe-se às oportunidades.*")
+
+            st.markdown("---")
+            
+            # BOTÕES DE ACESSO
+            col_b1, col_b2 = st.columns(2)
+            with col_b1:
                 if st.button("👤 JÁ SOU CONSULTOR (LOGIN)", use_container_width=True, type="primary"):
                     st.session_state['tela'] = 'login'
                     st.rerun()
-            with col2:
+            with col_b2:
                 if st.button("🚀 QUERO ME CADASTRAR AGORA", use_container_width=True):
                     st.session_state['tela'] = 'cadastro'
                     st.rerun()
@@ -187,7 +203,7 @@ def executar():
             st.rerun()
         else:
             st.write(f"### Bem-vindo ao módulo {escolha}")
-            st.info("Selecione uma opção no menu lateral para começar.")
+            st.info("Utilize o menu lateral para navegar.")
 
 if __name__ == "__main__":
     executar()
