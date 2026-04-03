@@ -9,9 +9,9 @@ import urllib.parse
 from google.oauth2.service_account import Credentials
 
 # --- 1. IMPORTAÇÃO DOS MÓDULOS ---
-import radar_emendas_2026  
-import recursos2026        
-import revisor_estatuto    
+import radar_emendas_2026
+import recursos2026
+import revisor_estatuto
 
 # --- 2. FUNÇÕES DE APOIO ---
 
@@ -126,7 +126,6 @@ def tela_cadastro():
 # --- 5. NAVEGAÇÃO E LÓGICA PRINCIPAL ---
 
 def executar():
-    # Correção da lógica de inicialização
     if 'logado' not in st.session_state:
         st.session_state['logado'] = False
     if 'tela' not in st.session_state:
@@ -139,25 +138,31 @@ def executar():
             st.markdown("---")
             c1, c2 = st.columns(2)
             if c1.button("👤 LOGIN", use_container_width=True, type="primary"):
-                st.session_state['tela'] = 'login'; st.rerun()
+                st.session_state['tela'] = 'login'
+                st.rerun()
             if c2.button("🚀 CADASTRAR", use_container_width=True):
-                st.session_state['tela'] = 'cadastro'; st.rerun()
+                st.session_state['tela'] = 'cadastro'
+                st.rerun()
 
         elif st.session_state['tela'] == 'cadastro': 
             tela_cadastro()
             
         elif st.session_state['tela'] == 'login':
             st.title("🔑 Acesso")
-            if st.button("⬅️ Voltar"): st.session_state['tela'] = 'home'; st.rerun()
+            if st.button("⬅️ Voltar"): 
+                st.session_state['tela'] = 'home'
+                st.rerun()
             with st.form("login_form"):
                 u = st.text_input("E-mail")
                 p = st.text_input("Senha", type="password")
                 if st.form_submit_button("Entrar"):
-                    if autenticar_usuario(u, p): st.rerun()
-                    else: st.error("Erro no login ou ativação pendente.")
+                    if autenticar_usuario(u, p): 
+                        st.rerun()
+                    else: 
+                        st.error("Erro no login ou ativação pendente.")
 
     else:
-        # --- ÁREA DO CONSULTOR LOGADO ---
+        # --- ÁREA LOGADA ---
         with st.sidebar:
             st.title("Core Essence")
             usuario_atual = st.session_state.get('usuario_nome', 'Consultor')
@@ -179,3 +184,8 @@ def executar():
             recursos2026.exibir_recursos()
         elif escolha == "📜 Revisor de Estatuto":
             revisor_estatuto.exibir_revisor()
+        elif escolha == "🔧 Gestão Admin":
+            st.write("Módulo Administrativo")
+
+if __name__ == "__main__":
+    executar()
