@@ -4,89 +4,75 @@ import gdown
 import os
 import unicodedata
 
+# Dicionário para converter Sigla em Nome Completo
+MAPA_ESTADOS = {
+    'AC': 'ACRE', 'AL': 'ALAGOAS', 'AP': 'AMAPA', 'AM': 'AMAZONAS', 'BA': 'BAHIA',
+    'CE': 'CEARA', 'DF': 'DISTRITO FEDERAL', 'ES': 'ESPIRITO SANTO', 'GO': 'GOIAS',
+    'MA': 'MARANHAO', 'MT': 'MATO GROSSO', 'MS': 'MATO GROSSO DO SUL', 'MG': 'MINAS GERAIS',
+    'PA': 'PARA', 'PB': 'PARAIBA', 'PR': 'PARANA', 'PE': 'PERNAMBUCO', 'PI': 'PIAUI',
+    'RJ': 'RIO DE JANEIRO', 'RN': 'RIO GRANDE DO NORTE', 'RS': 'RIO GRANDE DO SUL',
+    'RO': 'RONDONIA', 'RR': 'RORAIMA', 'SC': 'SANTA CATARINA', 'SP': 'SAO PAULO',
+    'SE': 'SERGIPE', 'TO': 'TOCANTINS'
+}
+
 def remover_acentos(texto):
-    """Função para transformar 'SÃO' em 'SAO', 'CEARÁ' em 'CEARA', etc."""
     if not isinstance(texto, str):
-        return texto
+        return str(texto)
     return "".join(c for c in unicodedata.normalize('NFD', texto) if unicodedata.category(c) != 'Mn').upper().strip()
 
 def exibir_radar():
     st.title("🏛️ Radar de Emendas Parlamentares 2026")
 
-    # 1. Configurações de Identificação do Arquivo
     file_id = st.secrets.get("file_id_emendas")
     nome_arquivo = "2026_Emendas.csv"
 
-    # 2. VERIFICAÇÃO E DOWNLOAD
     if not os.path.exists(nome_arquivo):
-        if not file_id:
-            st.error("ERRO: 'file_id_emendas' não configurado no st.secrets.")
-            return
-            
         with st.spinner("Sincronizando Base de Emendas..."):
             try:
                 url = f'https://drive.google.com/uc?id={file_id}'
                 gdown.download(url, nome_arquivo, quiet=False, fuzzy=True)
             except Exception as e:
-                st.error(f"Erro ao baixar base de dados: {e}")
+                st.error(f"Erro ao baixar base: {e}")
                 return
 
-    # 3. LEITURA DA BASE
     try:
-        df = pd.read_csv(
-            nome_arquivo, 
-            sep=None, 
-            engine='python', 
-            encoding='latin1', 
-            on_bad_lines='skip'
-        )
-        
-        # Padroniza nomes de colunas (MAIÚSCULO E SEM ESPAÇOS)
+        df = pd.read_csv(nome_arquivo, sep=None, engine='python', encoding='latin1', on_bad_lines='skip')
         df.columns = [str(c).strip().upper() for c in df.columns]
-
     except Exception as e:
-        st.error(f"Não foi possível carregar a base: {e}")
-        if os.path.exists(nome_arquivo):
-            os.remove(nome_arquivo)
+        st.error(f"Erro na leitura: {e}")
         return
 
-    # 4. LÓGICA DE FILTROS COM NORMALIZAÇÃO (CORREÇÃO DE ACENTOS)
+    # --- LÓGICA DE FILTRO POR NOME COMPLETO ---
     usuario = st.session_state.get('usuario_logado', {})
     plano = str(usuario.get('PLANO', 'BRONZE')).upper()
     
-    # Normaliza o local buscado (Ex: 'São Paulo' vira 'SAO PAULO')
-    local_busca = remover_acentos(usuario.get('LOCALIDADE') or "RJ")
+    # Pega a sigla (ex: RJ) e converte para nome completo (ex: RIO DE JANEIRO)
+    sigla_usuario = str(usuario.get('LOCALIDADE') or "RJ").strip().upper()
+    nome_completo_busca = MAPA_ESTADOS.get(sigla_usuario, sigla_usuario) 
+    
+    # Normaliza para garantir (remove acentos se houver no dicionário ou cadastro)
+    nome_completo_busca = remover_acentos(nome_completo_busca)
+    
     acesso_nacional = (plano in ["PREMIUM", "DIAMANTE", "OURO"])
 
     if "UF" in df.columns:
         if not acesso_nacional:
-            # CRIAMOS UMA COLUNA TEMPORÁRIA SEM ACENTOS PARA FILTRAR
-            # Isso garante que 'PARÁ' e 'PARA' sejam encontrados da mesma forma
-            df['UF_NORMALIZADA'] = df['UF'].apply(remover_acentos)
+            # Normaliza a coluna UF da planilha (transforma 'SÃO PAULO' em 'SAO PAULO')
+            df['UF_BUSCA'] = df['UF'].apply(remover_acentos)
             
-            # Aplica o filtro na coluna sem acentos
-            df = df[df['UF_NORMALIZADA'] == local_busca]
+            # Filtra pelo nome completo normalizado
+            df = df[df['UF_BUSCA'] == nome_completo_busca]
+            df = df.drop(columns=['UF_BUSCA'])
             
-            # Remove a coluna temporária para não poluir a visualização
-            df = df.drop(columns=['UF_NORMALIZADA'])
-            
-            st.info(f"📍 Filtro Inteligente Ativo: **{local_busca}** (Ignorando acentos)")
+            st.info(f"📍 Filtro Ativo: **{nome_completo_busca}**")
         else:
-            st.success(f"✅ Acesso Nacional Liberado (Plano {plano})")
+            st.success(f"✅ Acesso Nacional Liberado")
     else:
-        st.error("⚠️ Coluna 'UF' não encontrada na planilha!")
-        st.write("Colunas detectadas:", list(df.columns))
+        st.error("Coluna 'UF' não encontrada.")
         return
 
-    # 5. EXIBIÇÃO DOS RESULTADOS
     if df.empty:
-        st.warning(f"Nenhum registro encontrado para: {local_busca}")
+        st.warning(f"Nenhum registro encontrado para: {nome_completo_busca}")
     else:
-        st.write(f"Exibindo **{len(df)}** registros encontrados.")
-        
-        # Converte valores financeiros para exibição limpa
-        for col in df.columns:
-            if "VALOR" in col or "VAL" in col:
-                df[col] = pd.to_numeric(df[col], errors='coerce').fillna(0)
-
+        st.write(f"Encontrados: **{len(df)}** registros.")
         st.dataframe(df, use_container_width=True, hide_index=True)
