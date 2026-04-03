@@ -3,7 +3,7 @@ import pandas as pd
 import gdown
 import os
 
-# Dicionário de conversão (Sigla -> Nome na Base)
+# Dicionário de conversão (Sigla -> Nome na Base de Dados)
 DE_PARA_UF = {
     'AC': 'ACRE', 'AL': 'ALAGOAS', 'AP': 'AMAPA', 'AM': 'AMAZONAS', 'BA': 'BAHIA',
     'CE': 'CEARA', 'DF': 'DISTRITO FEDERAL', 'ES': 'ESPIRITO SANTO', 'GO': 'GOIAS',
@@ -30,7 +30,7 @@ def exibir_recursos():
     nome_arquivo = "20260320_Convenios.csv"
 
     if not os.path.exists(nome_arquivo):
-        with st.spinner("Sincronizando Base de Dados..."):
+        with st.spinner("Sincronizando Base de Dados Nacional..."):
             url = f'https://drive.google.com/uc?id={file_id}'
             gdown.download(url, nome_arquivo, quiet=False, fuzzy=True)
 
@@ -56,46 +56,48 @@ def exibir_recursos():
             st.success("✅ **PLANO:** PREMIUM (NACIONAL)")
         else:
             st.warning(f"💼 **PLANO:** BÁSICO (ESTADUAL)")
-            st.write(f"📍 **UF:** {uf_nome_completo}")
+            st.write(f"📍 **UF LIBERADA:** {uf_nome_completo}")
         st.divider()
 
-    # Termos desejados para as colunas
-    termos_desejados = ['ANO', 'TIPO', 'AUTOR', 'LOCALIDADE', 'UF', 'EMPENHADO', 'PAGO']
+    # Definição das colunas desejadas (A Localidade é a prioridade)
+    # Bloqueamos Município para não repetir
+    termos_busca = ['ANO', 'TIPO', 'AUTOR', 'LOCALIDADE DE APLICAÇÃO', 'UF', 'EMPENHADO', 'PAGO']
     lista_final = []
     
     try:
         reader = pd.read_csv(nome_arquivo, sep=None, engine='python', encoding='latin1', on_bad_lines='skip', chunksize=150000)
         
         for chunk in reader:
-            # Padroniza nomes de colunas
+            # Padroniza nomes de colunas (Maiúsculas e sem espaços extras)
             chunk.columns = [str(c).upper().strip() for c in chunk.columns]
             
-            # 1. FILTRO ANO 2026
+            # 1. Filtro de Ano (2026)
             col_ano = next((c for c in chunk.columns if 'ANO' in c), None)
             if col_ano:
                 chunk = chunk[chunk[col_ano].astype(str).str.contains('2026', na=False)]
             
             if chunk.empty: continue
 
-            # 2. FILTRO UF
+            # 2. Filtro de UF (Trava Estadual)
             if not acesso_nacional:
-                col_uf_base = next((c for c in chunk.columns if c == 'UF'), None)
-                if col_uf_base:
-                    chunk = chunk[chunk[col_uf_base].astype(str).str.upper() == uf_nome_completo]
+                col_uf_csv = next((c for c in chunk.columns if c == 'UF'), None)
+                if col_uf_csv:
+                    chunk = chunk[chunk[col_uf_csv].astype(str).str.upper() == uf_nome_completo]
 
             if chunk.empty: continue
 
-            # 3. SELEÇÃO DE COLUNAS
+            # 3. Seleção das Colunas Reais
             cols_selecionadas = []
-            for t in termos_desejados:
+            for t in termos_busca:
+                # Busca a coluna que contém o termo, mas BLOQUEIA CÓDIGOS e MUNICÍPIO
                 encontrada = next((c for c in chunk.columns if t in c 
                                   and 'COD' not in c 
                                   and 'ID' not in c 
-                                  and 'IBGE' not in c), None)
+                                  and 'MUNICÍPIO' not in c), None)
                 if encontrada:
                     cols_selecionadas.append(encontrada)
             
-            # Localidade como prioridade, Município como reserva
+            # Caso a Localidade falhe por algum erro na base, ele tenta Município como segurança final
             if not any('LOCALIDADE' in c for c in cols_selecionadas):
                 reserva = next((c for c in chunk.columns if 'MUNICÍPIO' in c and 'COD' not in c), None)
                 if reserva: cols_selecionadas.append(reserva)
@@ -106,11 +108,11 @@ def exibir_recursos():
         df_base = pd.concat(lista_final, ignore_index=True) if lista_final else pd.DataFrame()
 
     except Exception as e:
-        st.error(f"Erro no processamento: {e}")
+        st.error(f"Erro no processamento dos dados: {e}")
         return
 
     if df_base.empty:
-        st.warning(f"Sem dados para {uf_nome_completo} em 2026.")
+        st.warning(f"Nenhum dado encontrado para {uf_nome_completo} em 2026.")
         return
 
     # --- MÉTRICAS ---
@@ -128,4 +130,5 @@ def exibir_recursos():
         m2.metric(f"Total Pago ({label_local})", f"R$ {v_p:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.'))
     
     st.markdown("---") 
+    # Exibe a planilha com a Localidade de Aplicação do Recurso
     st.dataframe(df_base, use_container_width=True)
