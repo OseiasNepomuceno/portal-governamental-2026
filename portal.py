@@ -33,7 +33,6 @@ def exibir_dashboard_boas_vindas(nome, plano, uso_revisor):
             """, unsafe_allow_html=True
         )
 
-    # Limites atualizados para 15 e 10
     limite_revisoes = 15 if plano == "PREMIUM" else 10
     with col2:
         st.markdown(
@@ -107,11 +106,8 @@ def autenticar_usuario(usuario_digitado, senha_digitada):
         if os.path.exists(nome_arquivo): os.remove(nome_arquivo)
         gdown.download(url, nome_arquivo, quiet=True)
         df = pd.read_excel(nome_arquivo, sheet_name='usuario')
-        
-        # Limpeza de nomes de colunas
         df.columns = [str(c).strip().upper() for c in df.columns]
         
-        # Filtro de usuário e senha
         user_row = df[(df['USUARIO'].astype(str).str.strip() == str(usuario_digitado).strip()) & 
                       (df['SENHA'].astype(str).str.strip() == str(senha_digitada).strip())]
         
@@ -121,8 +117,10 @@ def autenticar_usuario(usuario_digitado, senha_digitada):
                 info_usuario = dados.to_dict()
                 info_usuario['PLANO'] = str(dados.get('PLANO', 'BÁSICO')).upper().strip()
                 
-                # BUSCA O SALDO NA COLUNA 6 (Índice 5 no DataFrame se for a 6ª coluna)
-                # Como usamos df.iloc[0], acessamos pelo nome da coluna que o Pandas mapeou
+                # CORREÇÃO DE ÍNDICES:
+                # Coluna E (Índice 4) = UF LIBERADA
+                # Coluna F (Índice 5) = REVISOES_USADAS
+                info_usuario['LOCALIDADE'] = dados.iloc[4] if len(dados) >= 5 else "BR"
                 info_usuario['REVISOES_USADAS'] = dados.iloc[5] if len(dados) >= 6 else 0
                 
                 st.session_state['usuario_logado'] = info_usuario
@@ -206,8 +204,9 @@ def tela_cadastro():
             
             if enviado:
                 if nome and email and senha:
-                    # Incluindo o '0' inicial para a coluna de REVISOES_USADAS (Coluna 6)
-                    sucesso = salvar_cadastro_google_sheets([email, senha, 'pendente', plano_f, 'CONSULTOR', 0, local])
+                    # CORREÇÃO DA ORDEM DE ENVIO (Sem 'CONSULTOR'):
+                    # [A:Email, B:Senha, C:Status, D:Plano, E:UF Liberada, F:Revisões Usadas]
+                    sucesso = salvar_cadastro_google_sheets([email, senha, 'pendente', plano_f, local, 0])
                     if sucesso:
                         enviar_aviso_email(nome, plano_f, email)
                         st.session_state['cadastro_concluido'] = True
@@ -304,8 +303,8 @@ def executar():
             plano_atual = st.session_state.get('usuario_plano', 'BÁSICO').upper()
             info_user = st.session_state.get('usuario_logado', {})
             
-            # Localidade
-            local = info_user.get('LOCALIDADE') or info_user.get('LOCAL_LIBERADO') or "BR"
+            # Localidade - Buscando agora do índice correto salvo no login
+            local = info_user.get('LOCALIDADE', "BR")
 
             st.info(f"👤 **LOGIN:** {usuario_atual}")
             st.success(f"🏆 **PLANO:** {plano_atual}")
@@ -320,7 +319,6 @@ def executar():
             escolha = st.radio("Módulos:", menu)
 
         if escolha == "🏠 Home":
-            # Pega o saldo atualizado da sessão
             uso_rev = info_user.get('REVISOES_USADAS', 0)
             exibir_dashboard_boas_vindas(usuario_atual, plano_atual, uso_rev)
         elif escolha == "🚪 Sair":
