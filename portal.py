@@ -9,6 +9,8 @@ from email.mime.text import MIMEText
 import urllib.parse
 from google.oauth2.service_account import Credentials
 import radar  # Certifique-se de que o radar.py está na mesma pasta
+import recursos  # Adicione este
+import revisao   # Adicione este
 
 # --- 1. FUNÇÕES DE APOIO (CONEXÃO GOOGLE E NOTIFICAÇÕES) ---
 
