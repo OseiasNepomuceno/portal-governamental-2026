@@ -133,32 +133,66 @@ def autenticar_usuario(usuario_digitado, senha_digitada):
 # --- 3. CONFIGURAÇÃO DA PÁGINA ---
 st.set_page_config(page_title="Core Essence | Inteligência Governamental", page_icon="🛰️", layout="wide")
 
-# --- 4. TELA DE CADASTRO ---
+# --- 4. TELA DE CADASTRO (ATUALIZADA: BÁSICO & PREMIUM) ---
 def tela_cadastro():
-    st.title("🚀 Cadastro de Novo Consultor")
+    st.markdown("<h2 style='text-align: center; color: #28a745;'>🚀 Iniciar Nova Consultoria</h2>", unsafe_allow_html=True)
+    
+    # Links de pagamento atualizados
     links_pagamento = {
-        "BRONZE": "https://mpago.la/1gf9ryq", 
-        "PRATA": "https://mpago.la/1bGimm8", 
-        "OURO": "https://mpago.la/1x63i2w", 
-        "DIAMANTE": "https://mpago.la/2CUKQgx"
+        "BÁSICO": "https://mpago.la/1gf9ryq", 
+        "PREMIUM": "https://mpago.la/2CUKQgx"
     }
 
-    if st.button("⬅️ Voltar"):
+    if st.button("⬅️ Voltar para o Início"):
         st.session_state['tela'] = 'home'
         st.rerun()
 
     if not st.session_state.get('cadastro_concluido', False):
-        opcoes = {"BRONZE: 03 Municípios": "BRONZE", "PRATA: 01 Estado": "PRATA", "OURO: 03 Estados": "OURO", "DIAMANTE: Nacional": "DIAMANTE"}
-        escolha_v = st.selectbox("Selecione seu Plano:", list(opcoes.keys()))
+        # Exibição comparativa dos planos
+        col_p1, col_p2 = st.columns(2)
+        
+        with col_p1:
+            st.markdown("""
+                <div style="background-color: #f8f9fa; padding: 15px; border-radius: 10px; border-top: 5px solid #6c757d; min-height: 220px;">
+                    <h4 style="color: #495057; margin:0;">🌱 PLANO BÁSICO</h4>
+                    <p style="font-size: 13px; color: #666;">Essencial para monitoramento regional.</p>
+                    <ul style="font-size: 12px; color: #444;">
+                        <li>Radar de Emendas (03 Cidades)</li>
+                        <li>Monitoramento de Recursos 2026</li>
+                        <li>Até 50 Revisões de Estatuto por IA</li>
+                    </ul>
+                </div>
+            """, unsafe_allow_html=True)
+            
+        with col_p2:
+            st.markdown("""
+                <div style="background-color: #e7f5ff; padding: 15px; border-radius: 10px; border-top: 5px solid #007bff; min-height: 220px;">
+                    <h4 style="color: #007bff; margin:0;">💎 PLANO PREMIUM</h4>
+                    <p style="font-size: 13px; color: #666;">Acesso total e inteligência avançada.</p>
+                    <ul style="font-size: 12px; color: #444;">
+                        <li>Acesso Nacional (Brasil Inteiro)</li>
+                        <li>Inteligência de Dados Prioritária</li>
+                        <li>Até 150 Revisões de Estatuto por IA</li>
+                    </ul>
+                </div>
+            """, unsafe_allow_html=True)
+        
+        st.write("\n")
+        
+        opcoes = {
+            "PLANO BÁSICO (Monitoramento Regional)": "BÁSICO", 
+            "PLANO PREMIUM (Acesso Nacional + IA)": "PREMIUM"
+        }
+        escolha_v = st.selectbox("Selecione o plano desejado:", list(opcoes.keys()))
         plano_f = opcoes[escolha_v]
         
-        with st.form("form_cadastro"):
+        with st.form("form_cadastro_v2"):
             nome = st.text_input("Nome Completo")
             email = st.text_input("E-mail (Login)")
             senha = st.text_input("Senha", type="password")
-            local = st.text_input("Localidades (Cidades ou UFs)")
+            local = st.text_input("Local de Atuação (Cidade ou UF)")
             
-            enviado = st.form_submit_button("PRÓXIMO PASSO: PAGAMENTO ➡️")
+            enviado = st.form_submit_button("PRÓXIMO PASSO: PAGAMENTO ➡️", use_container_width=True)
             
             if enviado:
                 if nome and email and senha:
@@ -173,7 +207,8 @@ def tela_cadastro():
                     st.error("Preencha todos os campos obrigatórios.")
     else:
         st.success(f"✅ Cadastro recebido, {st.session_state['nome_temp']}!")
-        st.link_button(f"💳 PAGAR PLANO {st.session_state['plano_selecionado']}", links_pagamento.get(st.session_state['plano_selecionado'], ""), use_container_width=True)
+        st.write(f"Você selecionou o **PLANO {st.session_state['plano_selecionado']}**.")
+        st.link_button(f"💳 PAGAR AGORA", links_pagamento.get(st.session_state['plano_selecionado'], ""), use_container_width=True)
         st.info("Após o pagamento, seu acesso será liberado em até 30 min.")
 
 # --- 5. NAVEGAÇÃO E LÓGICA PRINCIPAL ---
@@ -190,14 +225,14 @@ def executar():
             st.markdown("<h3 style='text-align: center;'>Inteligência Governamental Estratégica</h3>", unsafe_allow_html=True)
             st.write("\n")
 
-            # --- CARDS DE ENTRADA (MERCADO E ACESSO) ---
+            # --- CARDS DE ENTRADA ---
             col1, col2, col3 = st.columns(3)
 
             with col1:
                 st.markdown("""
                     <div style="background-color: #f8f9fa; padding: 20px; border-radius: 15px; border-top: 5px solid #007bff; min-height: 250px; text-align: center;">
                         <h4 style="color: #007bff;">👤 Já é Cliente?</h4>
-                        <p style="font-size: 14px; color: #555;">Acesse sua área exclusiva para monitorar emendas e recursos em tempo real com dados atualizados.</p>
+                        <p style="font-size: 14px; color: #555;">Acesse sua área exclusiva para monitorar emendas e recursos em tempo real.</p>
                     </div>
                 """, unsafe_allow_html=True)
                 if st.button("FAZER LOGIN", use_container_width=True, type="primary"):
@@ -208,7 +243,7 @@ def executar():
                 st.markdown("""
                     <div style="background-color: #f8f9fa; padding: 20px; border-radius: 15px; border-top: 5px solid #28a745; min-height: 250px; text-align: center;">
                         <h4 style="color: #28a745;">🚀 Seja Consultor</h4>
-                        <p style="font-size: 14px; color: #555;">Cadastre-se para utilizar nossas ferramentas de IA e transformar sua atuação parlamentar e governamental.</p>
+                        <p style="font-size: 14px; color: #555;">Cadastre-se para utilizar nossas ferramentas de IA e transformar sua atuação parlamentar.</p>
                     </div>
                 """, unsafe_allow_html=True)
                 if st.button("CRIAR CONTA / CADASTRAR", use_container_width=True):
@@ -219,7 +254,7 @@ def executar():
                 st.markdown("""
                     <div style="background-color: #f8f9fa; padding: 20px; border-radius: 15px; border-top: 5px solid #ffc107; min-height: 250px; text-align: center;">
                         <h4 style="color: #856404;">🛰️ Ecossistema</h4>
-                        <p style="font-size: 14px; color: #555;">A Core Essence une tecnologia de ponta e consultoria humana para garantir o sucesso na captação de recursos.</p>
+                        <p style="font-size: 14px; color: #555;">A Core Essence une tecnologia de ponta e consultoria humana para captação estratégica de recursos.</p>
                     </div>
                 """, unsafe_allow_html=True)
                 st.info("💡 Consultoria + Tecnologia")
