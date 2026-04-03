@@ -126,4 +126,56 @@ def tela_cadastro():
 # --- 5. NAVEGAÇÃO E LÓGICA PRINCIPAL ---
 
 def executar():
-    if 'logado' not in st.session_state: st.session_state['logado'] =
+    # Correção da lógica de inicialização
+    if 'logado' not in st.session_state:
+        st.session_state['logado'] = False
+    if 'tela' not in st.session_state:
+        st.session_state['tela'] = 'home'
+
+    if not st.session_state['logado']:
+        if st.session_state['tela'] == 'home':
+            st.markdown("<h1 style='text-align: center;'>🛰️ Core Essence</h1>", unsafe_allow_html=True)
+            st.markdown("<h3 style='text-align: center;'>Inteligência Governamental Estratégica</h3>", unsafe_allow_html=True)
+            st.markdown("---")
+            c1, c2 = st.columns(2)
+            if c1.button("👤 LOGIN", use_container_width=True, type="primary"):
+                st.session_state['tela'] = 'login'; st.rerun()
+            if c2.button("🚀 CADASTRAR", use_container_width=True):
+                st.session_state['tela'] = 'cadastro'; st.rerun()
+
+        elif st.session_state['tela'] == 'cadastro': 
+            tela_cadastro()
+            
+        elif st.session_state['tela'] == 'login':
+            st.title("🔑 Acesso")
+            if st.button("⬅️ Voltar"): st.session_state['tela'] = 'home'; st.rerun()
+            with st.form("login_form"):
+                u = st.text_input("E-mail")
+                p = st.text_input("Senha", type="password")
+                if st.form_submit_button("Entrar"):
+                    if autenticar_usuario(u, p): st.rerun()
+                    else: st.error("Erro no login ou ativação pendente.")
+
+    else:
+        # --- ÁREA DO CONSULTOR LOGADO ---
+        with st.sidebar:
+            st.title("Core Essence")
+            usuario_atual = st.session_state.get('usuario_nome', 'Consultor')
+            st.info(f"🏆 Plano: {st.session_state.get('usuario_plano', 'BRONZE')}")
+            
+            menu = ["📊 Recursos 2026", "🏛️ Radar de Emendas", "📜 Revisor de Estatuto"]
+            if usuario_atual.lower() == "oseiasnepom@gmail.com":
+                menu.append("🔧 Gestão Admin")
+            menu.append("🚪 Sair")
+            
+            escolha = st.radio("Módulos:", menu)
+
+        if escolha == "🚪 Sair":
+            st.session_state.clear()
+            st.rerun()
+        elif escolha == "🏛️ Radar de Emendas":
+            radar_emendas_2026.exibir_radar()
+        elif escolha == "📊 Recursos 2026":
+            recursos2026.exibir_recursos()
+        elif escolha == "📜 Revisor de Estatuto":
+            revisor_estatuto.exibir_revisor()
