@@ -18,7 +18,6 @@ def limpar_valor(v):
     if pd.isna(v) or str(v).strip() in ["", "0"]: 
         return 0.0
     try:
-        # Padronização: R$ 1.234,56 -> 1234.56
         v = str(v).upper().replace('R$', '').replace(' ', '').replace('.', '').replace(',', '.').strip()
         return float(v)
     except: 
@@ -60,15 +59,15 @@ def exibir_recursos():
             st.write(f"📍 **UF LIBERADA:** {uf_nome_menu}")
         st.divider()
 
-    # --- COLUNAS SELECIONADAS (Incluindo Valor Liquidado) ---
-    colunas_finais = [
+    # --- DEFINIÇÃO DE COLUNAS (Nomes Exatos do seu Diagnóstico) ---
+    colunas_desejadas = [
         "Ano da Emenda", 
         "Tipo de Emenda", 
         "Nome do Autor da Emenda", 
         "Localidade de aplicação do recurso", 
         "UF", 
         "Valor Empenhado", 
-        "Valor Liquidado", 
+        "Valor Liquidado",  # <--- Coluna inserida conforme diagnóstico
         "Valor Pago"
     ]
     
@@ -78,15 +77,51 @@ def exibir_recursos():
         reader = pd.read_csv(nome_arquivo, sep=None, engine='python', encoding='latin1', on_bad_lines='skip', chunksize=200000)
         
         for chunk in reader:
-            # 1. Filtro de Ano 2026
+            # 1. Filtro Ano 2026
             if "Ano da Emenda" in chunk.columns:
                 chunk = chunk[chunk["Ano da Emenda"].astype(str).str.contains('2026', na=False)]
             
             if chunk.empty: continue
 
-            # 2. Filtro de Localidade / UF
+            # 2. Filtro Localidade/UF
             if not acesso_nacional:
                 col_loc = "Localidade de aplicação do recurso"
                 col_uf = "UF"
                 condicao_loc = chunk[col_loc].astype(str).str.upper().str.contains(uf_sigla, na=False)
-                condicao_uf = chunk[col_
+                condicao_uf = chunk[col_uf].astype(str).str.upper() == uf_nome_menu
+                chunk = chunk[condicao_loc | condicao_uf]
+
+            if chunk.empty: continue
+
+            # 3. Seleção de Colunas (Garante que o Valor Liquidado entre)
+            cols_atuais = [c for c in colunas_desejadas if c in chunk.columns]
+            lista_final.append(chunk[cols_atuais].copy())
+
+        df_base = pd.concat(lista_final, ignore_index=True) if lista_final else pd.DataFrame()
+
+    except Exception as e:
+        st.error(f"Erro no processamento: {e}")
+        return
+
+    if df_base.empty:
+        st.warning(f"Nenhum dado encontrado para {uf_sigla} em 2026.")
+        return
+
+    # --- MÉTRICAS ---
+    m1, m2, m3 = st.columns(3)
+    label_local = "BRASIL" if acesso_nacional else uf_nome_menu
+    
+    # Cálculos financeiros baseados nos nomes exatos
+    v_e = df_base["Valor Empenhado"].apply(limpar_valor).sum() if "Valor Empenhado" in df_base.columns else 0
+    v_l = df_base["Valor Liquidado"].apply(limpar_valor).sum() if "Valor Liquidado" in df_base.columns else 0
+    v_p = df_base["Valor Pago"].apply(limpar_valor).sum() if "Valor Pago" in df_base.columns else 0
+    
+    m1.metric("Total Empenhado", f"R$ {v_e:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.'))
+    m2.metric("Total Liquidado", f"R$ {v_l:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.'))
+    m3.metric("Total Pago", f"R$ {v_p:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.'))
+    
+    st.markdown("---") 
+    st.write(f"Exibindo **{len(df_base)}** registros encontrados ({label_local}).")
+    
+    # Exibe a planilha final
+    st.dataframe(df_base, use_container_width=True)
