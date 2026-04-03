@@ -9,12 +9,12 @@ from email.mime.text import MIMEText
 import urllib.parse
 from google.oauth2.service_account import Credentials
 
-# Importação dos módulos customizados
-import radar    # radar.py
-import recursos # recursos.py
-import revisao  # revisao.py
+# --- 1. IMPORTAÇÃO DOS MÓDULOS ORIGINAIS (NOMES RESTAURADOS) ---
+import radar_emendas_2026  # Antigo radar.py
+import recursos2026        # Antigo recursos.py
+import revisor_estatuto    # Antigo revisao.py
 
-# --- 1. FUNÇÕES DE APOIO (CONEXÃO GOOGLE E NOTIFICAÇÕES) ---
+# --- 2. FUNÇÕES DE APOIO (CONEXÃO GOOGLE E NOTIFICAÇÕES) ---
 
 def salvar_cadastro_google_sheets(dados_cliente):
     scope = ["https://www.googleapis.com/auth/spreadsheets", "https://www.googleapis.com/auth/drive"]
@@ -76,10 +76,10 @@ def autenticar_usuario(usuario_digitado, senha_digitada):
         return False
     except: return False
 
-# --- 2. CONFIGURAÇÃO DA PÁGINA ---
+# --- 3. CONFIGURAÇÃO DA PÁGINA ---
 st.set_page_config(page_title="Core Essence", page_icon="🛰️", layout="wide")
 
-# --- 3. TELAS DO SISTEMA ---
+# --- 4. TELAS DO SISTEMA ---
 
 def tela_cadastro():
     st.title("🚀 Cadastro de Novo Consultor")
@@ -113,7 +113,7 @@ def tela_cadastro():
         st.link_button(f"👉 PAGAR PLANO {st.session_state['plano_selecionado']}", links_pagamento.get(st.session_state['plano_selecionado'], ""))
         st.info("Após o pagamento, seu acesso será liberado em até 30 min.")
 
-# --- 4. NAVEGAÇÃO E LÓGICA PRINCIPAL ---
+# --- 5. NAVEGAÇÃO E LÓGICA PRINCIPAL ---
 
 def executar():
     if 'logado' not in st.session_state: st.session_state['logado'] = False
@@ -155,14 +155,13 @@ def executar():
             st.info(f"🏆 Plano: {plano}")
             
             # Definição do Menu
-            menu = ["📊 Recursos", "🏛️ Radar de Emendas", "📜 Revisão"]
+            menu = ["📊 Recursos 2026", "🏛️ Radar de Emendas", "📜 Revisor de Estatuto"]
             if usuario_atual == "oseiasnepom@gmail.com": 
                 menu.append("🔧 Gestão Admin")
             menu.append("🚪 Sair")
             
             escolha = st.radio("Módulos:", menu)
 
-        # Lógica de Exibição dos Módulos
         if escolha == "🚪 Sair":
             st.session_state.clear()
             st.rerun()
@@ -194,13 +193,13 @@ def executar():
                 st.error(f"Erro na gestão: {e}")
 
         elif escolha == "🏛️ Radar de Emendas":
-            radar.exibir_radar()
+            radar_emendas_2026.exibir_radar() # Chama a função do arquivo original
             
-        elif escolha == "📊 Recursos":
-            recursos.exibir_recursos() 
+        elif escolha == "📊 Recursos 2026":
+            recursos2026.exibir_recursos()    # Chama a função do arquivo original
 
-        elif escolha == "📜 Revisão":
-            revisao.exibir_revisao()
+        elif escolha == "📜 Revisor de Estatuto":
+            revisor_estatuto.exibir_revisor() # Chama a função do arquivo original
 
 # --- INICIALIZAÇÃO ---
 if __name__ == "__main__":
