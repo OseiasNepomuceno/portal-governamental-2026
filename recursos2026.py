@@ -1,29 +1,21 @@
-# Arquivo Final - Core Essence - Blindagem de Acentos e Chunks - 03/04/2026
+# Arquivo Final - Core Essence - Debug de Permissões - 03/04/2026
 import streamlit as st
 import pandas as pd
 import gdown
 import os
 import unicodedata
 
-# --- FUNÇÃO MESTRA DE NORMALIZAÇÃO ---
 def normalizar_texto(texto):
-    if pd.isna(texto) or texto is None:
-        return ""
-    # 1. Converte para String e remove espaços extras
-    texto_limpo = str(texto).strip().upper()
-    # 2. Decompõe caracteres acentuados (Ex: 'Ó' vira 'O' + '´')
-    nfkd_form = unicodedata.normalize('NFKD', texto_limpo)
-    # 3. Filtra apenas o que não for acento e junta tudo
+    if pd.isna(texto) or texto is None: return ""
+    nfkd_form = unicodedata.normalize('NFKD', str(texto).strip().upper())
     return "".join([c for c in nfkd_form if not unicodedata.combining(c)])
 
 def limpar_valor_monetario(v):
-    if pd.isna(v) or str(v).strip() in ["", "0"]:
-        return 0.0
+    if pd.isna(v) or str(v).strip() in ["", "0"]: return 0.0
     try:
         v = str(v).upper().replace('R$', '').replace(' ', '').replace('.', '').replace(',', '.').strip()
         return float(v)
-    except:
-        return 0.0
+    except: return 0.0
 
 def exibir_recursos():
     st.title("📊 Radar de Recursos (Core Essence)")
@@ -35,20 +27,27 @@ def exibir_recursos():
         with st.spinner("Baixando base de dados..."):
             gdown.download(f'https://drive.google.com/uc?id={file_id}', nome_arquivo, quiet=True)
 
+    # --- DIAGNÓSTICO DO USUÁRIO ---
     usuario = st.session_state.get('usuario_logado')
+    
     if not usuario:
-        st.warning("Por favor, faça o login para continuar.")
+        st.error("⚠️ Erro: Usuário não identificado no sistema. Por favor, saia e faça o login novamente.")
         return
 
-    # --- PREPARAÇÃO DAS PERMISSÕES (SEM ACENTOS) ---
+    # Tentativa flexível de pegar o local liberado (evita erro de nome de coluna)
+    # Ele tenta 'local_liberado', 'LOCAL_LIBERADO', 'LOCAL' ou 'Cidades'
+    locais_bruto = usuario.get('local_liberado') or usuario.get('LOCAL_LIBERADO') or usuario.get('LOCAL') or ""
+    
     plano = str(usuario.get('PLANO', 'BRONZE')).upper()
-    locais_usuario = str(usuario.get('local_liberado', ''))
+    permitidos_norm = [normalizar_texto(c) for c in str(locais_bruto).split(',') if c.strip()]
     
-    # Criamos a lista de cidades permitidas já normalizada (sem acentos)
-    # Ex: 'NITERÓI' vira 'NITEROI'
-    permitidos_norm = [normalizar_texto(c) for c in locais_usuario.split(',') if c.strip()]
-    
-    # Adicionamos siglas automáticas para Estados (RJ, SP, etc)
+    # Se ainda estiver vazio, o código para aqui e te avisa o que tem dentro do 'usuario'
+    if not permitidos_norm and plano != "OURO" and plano != "ADMIN":
+        st.error("❌ Permissão de local não encontrada no seu cadastro.")
+        with st.expander("Clique aqui para ver os dados do seu login (Debug)"):
+            st.write(usuario)
+        return
+
     mapeamento_uf = {'RIO DE JANEIRO': 'RJ', 'SAO PAULO': 'SP', 'MINAS GERAIS': 'MG', 'ESPIRITO SANTO': 'ES'}
     siglas_permitidas = [mapeamento_uf.get(p, p) for p in permitidos_norm]
 
@@ -56,31 +55,23 @@ def exibir_recursos():
     
     try:
         status = st.empty()
-        # Lendo em blocos de 60 mil linhas para não estourar a memória (400MB)
         reader = pd.read_csv(nome_arquivo, sep=None, engine='python', encoding='latin1', 
                              on_bad_lines='skip', chunksize=60000)
         
         for i, chunk in enumerate(reader):
-            status.info(f"Analisando parte {i+1} da base de dados...")
-            
-            # Padroniza nomes das colunas (Ex: 'Município' -> 'MUNICIPIO')
+            status.info(f"Lendo parte {i+1} da base de dados...")
             chunk.columns = [normalizar_texto(c) for c in chunk.columns]
             
-            # Identifica as colunas principais de forma flexível
             col_mun = next((c for c in chunk.columns if 'MUNICI' in c), None)
             col_uf = next((c for c in chunk.columns if c in ['UF', 'ESTADO', 'SIGLA_UF']), 'UF')
 
             if col_mun:
-                # Criamos colunas temporárias no chunk SEM ACENTOS para comparar
                 chunk['MUN_BUSCA'] = chunk[col_mun].apply(normalizar_texto)
                 chunk['UF_BUSCA'] = chunk[col_uf].apply(normalizar_texto)
                 
                 if "BRONZE" in plano:
-                    # Match de cidades (ignorando acento de ambos os lados)
-                    mask = chunk['MUN_BUSCA'].isin(permitidos_norm)
-                    chunk_f = chunk[mask].copy()
+                    chunk_f = chunk[chunk['MUN_BUSCA'].isin(permitidos_norm)].copy()
                 elif "PRATA" in plano:
-                    # Match de Estado (Nome ou Sigla)
                     mask = (chunk['UF_BUSCA'].isin(permitidos_norm)) | (chunk['UF_BUSCA'].isin(siglas_permitidas))
                     chunk_f = chunk[mask].copy()
                 else:
@@ -93,33 +84,26 @@ def exibir_recursos():
         df_base = pd.concat(lista_pedacos, ignore_index=True) if lista_pedacos else pd.DataFrame()
 
     except Exception as e:
-        st.error(f"Erro no processamento dos dados: {e}")
+        st.error(f"Erro no processamento: {e}")
         return
 
     if df_base.empty:
-        st.error("❌ Nenhum dado encontrado para sua região.")
-        st.write(f"**Cidades/Estados buscados:** `{permitidos_norm}`")
+        st.warning(f"Nenhum dado encontrado para: {permitidos_norm}")
         return
 
-    # --- PREPARAÇÃO DE VALORES E EXIBIÇÃO ---
+    # --- EXIBIÇÃO ---
     col_valor = next((c for c in df_base.columns if 'VALOR' in c), None)
     if col_valor:
         df_base['VALOR_NUM'] = df_base[col_valor].apply(limpar_valor_monetario)
 
-    st.markdown("### 🔍 Pesquisa nos Resultados")
-    termo = st.text_input("Filtrar por Favorecido ou Objeto (ex: PREFEITURA):")
+    st.markdown("### 🔍 Pesquisa")
+    termo = st.text_input("Buscar Favorecido ou Objeto:")
     
     df_f = df_base.copy()
     if termo:
         termo_n = normalizar_texto(termo)
-        # Busca insensível a acentos em todas as colunas
-        mask = df_f.astype(str).apply(lambda x: x.str.normalize('NFKD').str.encode('ascii', errors='ignore').str.decode('utf-8').str.upper().str.contains(termo_n)).any(axis=1)
+        mask = df_f.astype(str).apply(lambda x: x.str.upper().str.contains(termo_n)).any(axis=1)
         df_f = df_f[mask]
 
-    # Dashboard Final
-    total = df_f['VALOR_NUM'].sum() if 'VALOR_NUM' in df_f.columns else 0
-    st.metric("Total de Recursos Encontrados", f"R$ {total:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.'))
-    
-    # Remove colunas de busca interna antes de mostrar ao usuário
-    cols_para_excluir = ['MUN_BUSCA', 'UF_BUSCA', 'VALOR_NUM']
-    st.dataframe(df_f.drop(columns=[c for c in cols_para_excluir if c in df_f.columns]), use_container_width=True)
+    st.metric("Total", f"R$ {df_f['VALOR_NUM'].sum():,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.'))
+    st.dataframe(df_f.drop(columns=['MUN_BUSCA', 'UF_BUSCA', 'VALOR_NUM'], errors='ignore'), use_container_width=True)
