@@ -80,7 +80,6 @@ st.set_page_config(page_title="Core Essence", page_icon="🛰️", layout="wide"
 def tela_cadastro():
     st.title("🚀 Cadastro de Novo Consultor")
     
-    # LINKS DO MERCADO PAGO (Substitua pelos seus links reais)
     links_pagamento = {
         "BRONZE": "https://mpago.la/1gf9ryq",
         "PRATA": "https://mpago.la/1bGimm8",
@@ -148,17 +147,14 @@ def tela_cadastro():
                 else:
                     st.error("Por favor, preencha Nome, E-mail e Senha.")
     else:
-        # TELA DE PAGAMENTO (APARECE APÓS O FORMULÁRIO)
         st.success(f"✅ Quase lá, {st.session_state['nome_temp']}! Cadastro recebido.")
         st.subheader("💳 Ativação do Acesso")
         st.write(f"Para liberar seu plano **{st.session_state['plano_selecionado']}**, finalize o pagamento abaixo:")
         
         link_mp = links_pagamento.get(st.session_state['plano_selecionado'], "")
-        
         st.link_button(f"👉 PAGAR PLANO {st.session_state['plano_selecionado']} NO MERCADO PAGO", link_mp, type="primary")
         
-        st.info("💡 Após o pagamento, seu acesso será liberado em até 30 minutos. Você receberá um aviso no e-mail cadastrado.")
-        
+        st.info("💡 Após o pagamento, seu acesso será liberado em até 30 minutos.")
         link_zap = gerar_link_whatsapp(st.session_state['nome_temp'], st.session_state['plano_selecionado'])
         st.link_button("📱 JÁ PAGUEI? ENVIAR COMPROVANTE AGORA", link_zap)
 
@@ -178,11 +174,11 @@ def executar():
             
             c_f1, c_f2, c_f3 = st.columns(3)
             with c_f1:
-                st.info("**Para nossos Consultores:**\n\n*Bem-vindo de volta ao centro da estratégia. Acesse seus dados abaixo.*")
+                st.info("**Para nossos Consultores:**\n\n*Bem-vindo de volta ao centro da estratégia.*")
             with c_f2:
-                st.success("**Para novos Membros:**\n\n*Transforme dados governamentais em faturamento real com nossa IA.*")
+                st.success("**Para novos Membros:**\n\n*Transforme dados governamentais em faturamento real.*")
             with c_f3:
-                st.warning("**Por que Core Essence?**\n\n*Não apenas monitore recursos, antecipe-se às oportunidades.*")
+                st.warning("**Por que Core Essence?**\n\n*Não apenas monitore recursos, antecipe-se.*")
 
             st.markdown("---")
             
@@ -205,28 +201,45 @@ def executar():
                 st.session_state['tela'] = 'home'
                 st.rerun()
             with st.form("login_form"):
-                u = st.text_input("Usuário")
+                u = st.text_input("Usuário (E-mail)")
                 p = st.text_input("Senha", type="password")
                 if st.form_submit_button("Entrar"):
                     if autenticar_usuario(u, p):
                         st.rerun()
                     else:
-                        st.error("Usuário ou senha incorretos.")
+                        st.error("Usuário ou senha incorretos ou acesso ainda pendente.")
 
     else:
+        # --- ÁREA LOGADA COM RECONHECIMENTO DE ADMIN ---
         with st.sidebar:
             st.title("Core Essence")
             plano = st.session_state.get('usuario_plano', 'BRONZE')
+            usuario_atual = st.session_state.get('usuario_nome')
+            
             st.info(f"🏆 Plano: {plano}")
-            menu = ["📊 Recursos", "🏛️ Radar de Emendas", "📜 Revisão", "🚪 Sair"]
+            
+            # Lista básica de módulos
+            menu = ["📊 Recursos", "🏛️ Radar de Emendas", "📜 Revisão"]
+            
+            # SE FOR O OSEIAS, ADICIONA GESTÃO
+            if usuario_atual == "oseiasnepom@gmail.com":
+                menu.append("🔧 Gestão Admin")
+            
+            menu.append("🚪 Sair")
             escolha = st.radio("Módulos:", menu)
 
         if escolha == "🚪 Sair":
             st.session_state.clear()
             st.rerun()
+        
+        elif escolha == "🔧 Gestão Admin":
+            st.subheader("🔧 Painel de Controle - Administrador")
+            st.write("Bem-vindo, Oseias. Use este espaço para gerenciar o portal.")
+            st.warning("Módulo de ativação via App em desenvolvimento. Use a planilha Google para ativar usuários.")
+            
         else:
             st.write(f"### Bem-vindo ao módulo {escolha}")
-            st.info("Utilize o menu lateral para navegar.")
+            st.info("Utilize o menu lateral para navegar entre as ferramentas de inteligência.")
 
 if __name__ == "__main__":
     executar()
