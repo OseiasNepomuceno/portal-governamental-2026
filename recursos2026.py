@@ -1,4 +1,4 @@
-# Arquivo Otimizado - Core Essence - Foco 2026 e Colunas Essenciais - 03/04/2026
+# Arquivo Otimizado - Core Essence - Foco Município/UF 2026 - 03/04/2026
 import streamlit as st
 import pandas as pd
 import gdown
@@ -22,7 +22,7 @@ def exibir_recursos():
         return
 
     if not os.path.exists(nome_arquivo):
-        with st.spinner("Baixando base de dados..."):
+        with st.spinner("Sincronizando base de dados..."):
             url = f'https://drive.google.com/uc?id={file_id}'
             gdown.download(url, nome_arquivo, quiet=False, fuzzy=True)
 
@@ -31,8 +31,8 @@ def exibir_recursos():
         st.error("Usuário não identificado.")
         return
 
-    # --- DEFINIÇÃO DE COLUNAS DE INTERESSE ---
-    colunas_desejadas = [
+    # --- COLUNAS DE INTERESSE (SEM CÓDIGOS, APENAS NOMES) ---
+    colunas_selecionadas = [
         'ANO DA EMENDA', 'TIPO DA EMENDA', 'NOME DO AUTOR DA EMENDA', 
         'MUNICÍPIO', 'UF', 'VALOR EMPENHADO', 'VALOR LIQUIDADO', 'VALOR PAGO'
     ]
@@ -47,17 +47,17 @@ def exibir_recursos():
     
     try:
         status = st.empty()
-        # Lendo em blocos maiores (80k) já que estamos filtrando colunas, sobra mais RAM
+        # Chunksize de 80k para manter a velocidade
         reader = pd.read_csv(nome_arquivo, sep=None, engine='python', encoding='latin1', 
                              on_bad_lines='skip', chunksize=80000)
         
         for i, chunk in enumerate(reader):
             status.info(f"Processando Ciclo 2026... Bloco {i+1}")
             
-            # 1. Padroniza colunas para identificar os nomes reais no CSV
+            # Padroniza cabeçalhos
             chunk.columns = [str(c).upper().strip() for c in chunk.columns]
             
-            # 2. FILTRO IMEDIATO: Somente Ano 2026
+            # 1. FILTRO DE ANO (2026)
             col_ano = next((c for c in chunk.columns if 'ANO' in c and 'EMENDA' in c), None)
             if col_ano:
                 chunk = chunk[chunk[col_ano].astype(str).str.contains('2026', na=False)]
@@ -65,18 +65,18 @@ def exibir_recursos():
             if chunk.empty:
                 continue
 
-            # 3. FILTRO DE LOCALIDADE (Aplica a mesma norma para todos)
+            # 2. FILTRO DE LOCALIDADE
             if not ver_tudo:
-                col_mun = next((c for c in chunk.columns if 'MUNICI' in c), None)
+                col_mun = next((c for c in chunk.columns if 'MUNICI' in c and 'CODIGO' not in c), None)
                 if col_mun:
                     padrao = '|'.join(locais_limpos)
                     chunk = chunk[chunk[col_mun].astype(str).str.upper().str.contains(padrao, na=False)]
 
-            # 4. SELEÇÃO DE COLUNAS (Mantém apenas as 8 colunas de interesse)
-            # Buscamos as colunas que possuem os nomes solicitados
+            # 3. SELEÇÃO DAS COLUNAS (Apenas as 8 solicitadas)
             cols_finais = []
-            for ref in colunas_desejadas:
-                encontrada = next((c for c in chunk.columns if ref.upper() in c), None)
+            for ref in colunas_selecionadas:
+                # Busca a coluna que contém o nome mas NÃO contém 'CODIGO'
+                encontrada = next((c for c in chunk.columns if ref.upper() in c and 'COD' not in c), None)
                 if encontrada: cols_finais.append(encontrada)
             
             chunk = chunk[cols_finais].copy()
@@ -88,20 +88,4 @@ def exibir_recursos():
         df_base = pd.concat(lista_pedacos, ignore_index=True) if lista_pedacos else pd.DataFrame()
 
     except Exception as e:
-        st.error(f"Erro no processamento otimizado: {e}")
-        return
-
-    if df_base.empty:
-        st.warning(f"Nenhum recurso de 2026 localizado para: {locais_limpos}")
-        return
-
-    # --- CÁLCULOS PARA O DASHBOARD ---
-    # Identifica a coluna de Valor Pago para a métrica
-    col_pago = next((c for c in df_base.columns if 'PAGO' in c), None)
-    if col_pago:
-        df_base['VALOR_PAGO_SOMA'] = df_base[col_pago].apply(limpar_valor_monetario)
-        total_pago = df_base['VALOR_PAGO_SOMA'].sum()
-        st.metric("Total Pago (Exercício 2026)", f"R$ {total_pago:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.'))
-    
-    # Exibe a tabela apenas com as colunas solicitadas
-    st.dataframe(df_base.drop(columns=['VALOR_PAGO_SOMA'], errors='ignore'), use_container_width=True)
+        st.error(f
