@@ -1,3 +1,4 @@
+# Arquivo: revisao.py - Inteligência Core Essence
 import streamlit as st
 import google.generativeai as genai
 from PyPDF2 import PdfReader
@@ -6,14 +7,16 @@ from docx.shared import Pt
 from docx.enum.text import WD_ALIGN_PARAGRAPH
 import io
 
-def executar(): # ADICIONE ESTA LINHA
-   
-    # TODO O RESTANTE DO SEU CÓDIGO AQUI COM UM "TAB" PARA DENTRO
-
+def exibir_revisao():
     # --- CONFIGURAÇÃO DA API ---
-    API_KEY = st.secrets["GEMINI_API_KEY"]
-    genai.configure(api_key=API_KEY)
-    
+    # Certifique-se de que a chave GEMINI_API_KEY está nos Secrets do Streamlit Cloud
+    try:
+        API_KEY = st.secrets["GEMINI_API_KEY"]
+        genai.configure(api_key=API_KEY)
+    except Exception as e:
+        st.error("Erro: Chave API do Gemini não encontrada nos Secrets.")
+        return
+
     # 1. FUNÇÃO PARA EXTRAIR TEXTO
     def extrair_texto_pdf(arquivo_pdf):
         try:
@@ -26,41 +29,40 @@ def executar(): # ADICIONE ESTA LINHA
         except Exception as e:
             st.error(f"Erro ao ler PDF: {e}")
             return ""
-    
+
     # 2. FUNÇÃO DE ANÁLISE COM GEMINI
     def analisar_estatuto(texto_estatuto):
         try:
-            modelos_disponiveis = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
-            modelo_escolhido = next((m for m in ['models/gemini-1.5-flash', 'models/gemini-1.5-pro'] if m in modelos_disponiveis), modelos_disponiveis[0])
-            model = genai.GenerativeModel(modelo_escolhido)
+            # Lista modelos para garantir compatibilidade
+            model = genai.GenerativeModel('gemini-1.5-flash')
             
             prompt = f"""
-            Você é o Consultor Sênior da CORE ESSENCE. Analise o estatuto abaixo com base no MROSC e na Portaria 33/2023.
-            O parecer deve ser profissional, direto e estruturado para um documento oficial.
+            Você é o Consultor Sênior da CORE ESSENCE. Analise o estatuto abaixo com base no MROSC e na Portaria Conjunta 33/2023.
+            O parecer deve ser profissional, direto e estruturado para um documento oficial de consultoria governamental.
             
-            Estruture em:
-            1. ✅ PONTOS DE CONFORMIDADE
-            2. ⚠️ GARGALOS E RISCOS (Base Portaria 33/2023)
-            3. ❌ OMISSÕES OBRIGATÓRIAS
-            4. 💡 RECOMENDAÇÃO CORE ESSENCE
+            Estruture a resposta rigorosamente nestes tópicos:
+            1. ✅ PONTOS DE CONFORMIDADE (O que está correto)
+            2. ⚠️ GARGALOS E RISCOS (Baseado na Portaria 33/2023)
+            3. ❌ OMISSÕES OBRIGATÓRIAS (O que falta para aprovação de recursos)
+            4. 💡 RECOMENDAÇÃO CORE ESSENCE (Sugestão estratégica final)
     
             Ao final, adicione o campo:
             [NOME DO CONSULTOR]
             Consultor Sênior - CORE ESSENCE
     
-            Texto: {texto_estatuto[:25000]}
+            Texto do Estatuto: {texto_estatuto[:20000]} 
             """
             response = model.generate_content(prompt)
             return response.text
         except Exception as e:
-            st.error(f"Erro na IA: {e}")
+            st.error(f"Erro na Inteligência Artificial: {e}")
             return None
-    
+
     # 3. FUNÇÃO PARA GERAR O ARQUIVO WORD (.DOCX)
     def gerar_word_parecer(texto_parecer):
         doc = Document()
         
-        # Cabeçalho
+        # Cabeçalho formatado
         titulo = doc.add_paragraph()
         titulo.alignment = WD_ALIGN_PARAGRAPH.CENTER
         run = titulo.add_run("PARECER TÉCNICO DE CONFORMIDADE ESTATUTÁRIA")
@@ -75,50 +77,55 @@ def executar(): # ADICIONE ESTA LINHA
     
         doc.add_paragraph("_" * 50).alignment = WD_ALIGN_PARAGRAPH.CENTER
     
-        # Corpo do texto
-        # Removemos os asteriscos do Markdown para o Word ficar limpo
+        # Corpo do texto limpo
         texto_limpo = texto_parecer.replace("**", "")
         
         for linha in texto_limpo.split('\n'):
-            p = doc.add_paragraph(linha)
-            p.style.font.name = 'Arial'
-            p.style.font.size = Pt(11)
+            if linha.strip():
+                p = doc.add_paragraph(linha)
+                p.style.font.name = 'Arial'
+                p.style.font.size = Pt(11)
     
         # Rodapé
         doc.add_paragraph("\n")
-        footer = doc.add_paragraph("Documento gerado para revisão e edição técnica.")
+        footer = doc.add_paragraph("Documento gerado automaticamente para revisão técnica Core Essence.")
         footer.alignment = WD_ALIGN_PARAGRAPH.RIGHT
         
         buffer = io.BytesIO()
         doc.save(buffer)
         buffer.seek(0)
         return buffer
+
+    # --- INTERFACE ---
+    st.title("📜 Revisor de Estatuto (Portaria 33/2023)")
+    st.markdown("---")
     
-    # --- INTERFACE STREAMLIT ---
-    st.title("📑 Revisor de Estatuto 33/2023")
-    st.caption("CORE ESSENCE - Inteligência Estratégica")
+    st.info("Este módulo utiliza IA para verificar se o estatuto da entidade está apto a receber recursos conforme a nova legislação.")
     
-    st.info("💡 **Diferencial:** Analisando conforme a nova **Portaria Conjunta 33/2023**. O arquivo final será baixado em **Word** para sua edição.")
-    
-    arquivo = st.file_uploader("Upload do Estatuto (PDF)", type=["pdf"])
+    arquivo = st.file_uploader("Faça o upload do Estatuto em PDF", type=["pdf"])
     
     if arquivo:
-        texto_extraido = extrair_texto_pdf(arquivo)
-        if texto_extraido:
-            st.success("Documento carregado!")
-            if st.button("🚀 Gerar Minuta de Parecer (Word)"):
-                with st.spinner("Analisando e formatando documento editável..."):
+        st.success("Documento carregado com sucesso!")
+        if st.button("🚀 Iniciar Análise Estratégica"):
+            with st.spinner("Nossa IA está processando o documento e aplicando as regras da Portaria 33..."):
+                texto_extraido = extrair_texto_pdf(arquivo)
+                if texto_extraido:
                     resultado = analisar_estatuto(texto_extraido)
+                    
                     if resultado:
-                        st.markdown("---")
-                        st.subheader("📋 Prévia da Análise")
+                        st.markdown("### 📋 Prévia do Parecer")
                         st.write(resultado)
                         
                         word_final = gerar_word_parecer(resultado)
                         
                         st.download_button(
-                            label="📥 Baixar Parecer Editável (.docx)",
+                            label="📥 Baixar Parecer em Word (.docx)",
                             data=word_final,
-                            file_name="Parecer_CoreEssence_Editavel.docx",
-                            mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                            file_name="Parecer_Tecnico_CoreEssence.docx",
+                            mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                            use_container_width=True
                         )
+
+# Se rodar direto para teste
+if __name__ == "__main__":
+    exibir_revisao()
