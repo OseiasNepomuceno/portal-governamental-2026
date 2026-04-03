@@ -6,12 +6,10 @@ from docx.shared import Pt
 from docx.enum.text import WD_ALIGN_PARAGRAPH
 import io
 
-def exibir_revisor(): # Nome ajustado para bater com o portal.py
-    
+def exibir_revisor():
     # --- CONFIGURAÇÃO DA API ---
-    # Certifique-se que a chave GEMINI_API_KEY está nos Secrets do Streamlit
     if "GEMINI_API_KEY" not in st.secrets:
-        st.error("Erro: GEMINI_API_KEY não encontrada nos Secrets.")
+        st.error("Erro: GEMINI_API_KEY não encontrada nos Secrets do Streamlit.")
         return
 
     API_KEY = st.secrets["GEMINI_API_KEY"]
@@ -33,7 +31,7 @@ def exibir_revisor(): # Nome ajustado para bater com o portal.py
     # 2. FUNÇÃO DE ANÁLISE COM GEMINI
     def analisar_estatuto(texto_estatuto):
         try:
-            # Lista modelos para garantir compatibilidade
+            # Seleciona o modelo disponível
             modelos_disponiveis = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
             modelo_escolhido = next((m for m in ['models/gemini-1.5-flash', 'models/gemini-1.5-pro'] if m in modelos_disponiveis), modelos_disponiveis[0])
             model = genai.GenerativeModel(modelo_escolhido)
@@ -64,7 +62,7 @@ def exibir_revisor(): # Nome ajustado para bater com o portal.py
     def gerar_word_parecer(texto_parecer):
         doc = Document()
         
-        # Cabeçalho do Documento
+        # Cabeçalho
         titulo = doc.add_paragraph()
         titulo.alignment = WD_ALIGN_PARAGRAPH.CENTER
         run = titulo.add_run("PARECER TÉCNICO DE CONFORMIDADE ESTATUTÁRIA")
@@ -79,20 +77,22 @@ def exibir_revisor(): # Nome ajustado para bater com o portal.py
     
         doc.add_paragraph("_" * 50).alignment = WD_ALIGN_PARAGRAPH.CENTER
     
-        # Limpeza do texto para o Word (remove negritos do Markdown)
+        # Limpeza do texto para o Word
         texto_limpo = texto_parecer.replace("**", "").replace("###", "").replace("##", "")
         
         for linha in texto_limpo.split('\n'):
             if linha.strip():
                 p = doc.add_paragraph(linha.strip())
-                # Define fonte padrão para parecer oficial
-                run_p = p.runs[0] if p.runs else p.add_run()
+                if p.runs:
+                    run_p = p.runs[0]
+                else:
+                    run_p = p.add_run()
                 run_p.font.name = 'Arial'
                 run_p.font.size = Pt(11)
     
-        # Rodapé de Identificação
+        # Rodapé
         doc.add_paragraph("\n\n")
-        footer = doc.add_paragraph("Documento gerado automaticamente pelo Sistema Core Essence para fins de revisão técnica.")
+        footer = doc.add_paragraph("Documento gerado automaticamente pelo Sistema Core Essence.")
         footer.alignment = WD_ALIGN_PARAGRAPH.RIGHT
         
         buffer = io.BytesIO()
@@ -100,11 +100,11 @@ def exibir_revisor(): # Nome ajustado para bater com o portal.py
         buffer.seek(0)
         return buffer
     
-    # --- INTERFACE STREAMLIT ---
-    st.header("📑 Revisor de Estatuto 33/2023")
+    # --- INTERFACE ---
+    st.header("📜 Revisor de Estatuto 33/2023")
     st.write("Análise de conformidade para OSCs e Entidades do Terceiro Setor.")
     
-    st.info("💡 **Diferencial:** Analisando conforme o MROSC e a **Portaria Conjunta 33/2023**. Gere a minuta em Word para facilitar seu trabalho de consultoria.")
+    st.info("💡 **Diferencial:** Analisando conforme o MROSC e a **Portaria Conjunta 33/2023**.")
     
     arquivo = st.file_uploader("Faça o upload do Estatuto em PDF", type=["pdf"])
     
@@ -122,7 +122,6 @@ def exibir_revisor(): # Nome ajustado para bater com o portal.py
                         st.subheader("📋 Prévia do Parecer")
                         st.write(resultado)
                         
-                        # Gera o arquivo Word
                         word_final = gerar_word_parecer(resultado)
                         
                         st.download_button(
@@ -133,5 +132,6 @@ def exibir_revisor(): # Nome ajustado para bater com o portal.py
                             use_container_width=True
                         )
 
-# Para permitir testes individuais do arquivo
-if __name__
+# Execução independente
+if __name__ == "__main__":
+    exibir_revisor()
