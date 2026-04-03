@@ -191,9 +191,16 @@ def executar():
         elif escolha == "🏛️ Radar de Emendas":
             radar.exibir_radar()
             
-        else:
-            st.write(f"### Bem-vindo ao módulo {escolha}")
-            st.info("Utilize o menu lateral para navegar.")
+        elif escolha == "📊 Recursos":
+            # Aqui chamamos o arquivo recursos.py
+            recursos.exibir_recursos() 
+
+        elif escolha == "📜 Revisão":
+            # Aqui chamamos o arquivo revisao.py
+            revisao.exibir_revisao()
+
+        elif escolha == "🔧 Gestão Admin":
+            # ... seu código de gestão admin ...
 
 if __name__ == "__main__":
     executar()
