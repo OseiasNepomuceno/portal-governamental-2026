@@ -177,3 +177,8 @@ def executar():
     else:
         # ... (seu código da área logada com a sidebar aqui)
         st.sidebar.write("Bem-vindo!")
+
+# ... resto do seu código acima ...
+
+if __name__ == "__main__":
+    executar()
