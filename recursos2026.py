@@ -59,8 +59,7 @@ def exibir_recursos():
             st.write(f"📍 **UF:** {uf_nome_completo}")
         st.divider()
 
-    # LISTA DE PRIORIDADE (Damos preferência à Localidade)
-    # Removi 'MUNICÍPIO' da lista principal para forçar a Localidade
+    # Termos desejados (Localidade tem prioridade sobre Município)
     termos_desejados = ['ANO', 'TIPO', 'AUTOR', 'LOCALIDADE', 'UF', 'EMPENHADO', 'PAGO']
     lista_final = []
     
@@ -70,14 +69,14 @@ def exibir_recursos():
         for chunk in reader:
             chunk.columns = [str(c).upper().strip() for c in chunk.columns]
             
-            # 1. FILTRO ANO 2026
+            # 1. Filtro Ano 2026
             col_ano = next((c for c in chunk.columns if 'ANO' in c), None)
             if col_ano:
                 chunk = chunk[chunk[col_ano].astype(str).str.contains('2026', na=False)]
             
             if chunk.empty: continue
 
-            # 2. FILTRO POR UF
+            # 2. Filtro UF
             if not acesso_nacional:
                 col_uf_base = next((c for c in chunk.columns if c == 'UF'), None)
                 if col_uf_base:
@@ -85,10 +84,10 @@ def exibir_recursos():
 
             if chunk.empty: continue
 
-            # 3. SELEÇÃO DE COLUNAS COM TRAVA DE EXCLUSÃO
+            # 3. Seleção de Colunas Limpas
             cols_selecionadas = []
             for t in termos_desejados:
-                # Busca coluna que contenha o termo, BLOQUEANDO MUNICÍPIO E CÓDIGOS
+                # Busca a coluna, ignorando códigos e IDs
                 encontrada = next((c for c in chunk.columns if t in c 
                                   and 'COD' not in c 
                                   and 'ID' not in c 
@@ -96,26 +95,6 @@ def exibir_recursos():
                 if encontrada:
                     cols_selecionadas.append(encontrada)
             
-            # Se por acaso 'LOCALIDADE' não existir na base, aí sim buscamos Município como reserva
+            # Se a Localidade não foi encontrada, tenta Município como plano B
             if not any('LOCALIDADE' in c for c in cols_selecionadas):
-                reserva = next((c for c in chunk.columns if 'MUNICÍPIO' in c and 'COD' not in c), None)
-                if reserva: cols_selecionadas.append(reserva)
-
-            if cols_selecionadas:
-                lista_final.append(chunk[list(dict.fromkeys(cols_selecionadas))].copy())
-
-        df_base = pd.concat(lista_final, ignore_index=True) if lista_final else pd.DataFrame()
-
-    except Exception as e:
-        st.error(f"Erro técnico: {e}")
-        return
-
-    if df_base.empty:
-        st.warning(f"Nenhum dado encontrado para: {uf_nome_completo}")
-        return
-
-    # --- MÉTRICAS ---
-    col_p = next((c for c in df_base.columns if 'PAGO' in c), None)
-    col_e = next((c for c in df_base.columns if 'EMPENHADO' in c), None)
-
-    m
+                reserva = next((c for c in chunk.columns if 'MUNICÍPIO' in c and 'COD' not
