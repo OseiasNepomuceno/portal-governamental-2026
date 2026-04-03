@@ -79,61 +79,88 @@ st.set_page_config(page_title="Core Essence", page_icon="🛰️", layout="wide"
 
 def tela_cadastro():
     st.title("🚀 Cadastro de Novo Consultor")
-    st.write("Escolha seu plano e preencha os dados para solicitar seu acesso.")
     
+    # LINKS DO MERCADO PAGO (Substitua pelos seus links reais)
+    links_pagamento = {
+        "BRONZE": "https://mpago.la/1gf9ryq",
+        "PRATA": "https://mpago.la/1bGimm8",
+        "OURO": "https://mpago.la/1x63i2w",
+        "DIAMANTE": "https://mpago.la/2CUKQgx"
+    }
+
+    if 'cadastro_concluido' not in st.session_state:
+        st.session_state['cadastro_concluido'] = False
+
     if st.button("⬅️ Voltar para o Início", key="btn_voltar_home_cad"):
         st.session_state['tela'] = 'home'
+        st.session_state['cadastro_concluido'] = False
         st.rerun()
 
-    opcoes_planos = {
-        "BRONZE: Acesso a até 03 Municípios + 05 Revisões": "BRONZE",
-        "PRATA: Acesso a 01 Estado completo + 15 Revisões": "PRATA",
-        "OURO: Acesso a 03 Estados completos + 50 Revisões": "OURO",
-        "DIAMANTE: Acesso Nacional (Brasil) + 200 Revisões": "DIAMANTE"
-    }
-    
-    escolha_visual = st.selectbox("Selecione o Plano Desejado:", list(opcoes_planos.keys()))
-    plano_final = opcoes_planos[escolha_visual]
+    if not st.session_state['cadastro_concluido']:
+        st.write("Escolha seu plano e preencha os dados para solicitar seu acesso.")
+        
+        opcoes_planos = {
+            "BRONZE: Acesso a até 03 Municípios + 05 Revisões": "BRONZE",
+            "PRATA: Acesso a 01 Estado completo + 15 Revisões": "PRATA",
+            "OURO: Acesso a 03 Estados completos + 50 Revisões": "OURO",
+            "DIAMANTE: Acesso Nacional (Brasil) + 200 Revisões": "DIAMANTE"
+        }
+        
+        escolha_visual = st.selectbox("Selecione o Plano Desejado:", list(opcoes_planos.keys()))
+        plano_final = opcoes_planos[escolha_visual]
 
-    if plano_final == "BRONZE":
-        label_local = "📍 Liste as 03 Cidades de Interesse"
-        placeholder_local = "Ex: Presidente Prudente, Álvares Machado..."
-        tipo_consultor = "MUNICIPAL"
-    elif plano_final in ["PRATA", "OURO"]:
-        label_local = "📍 Liste os Estados (UF) de Interesse"
-        placeholder_local = "Ex: SP, RJ, MG"
-        tipo_consultor = "ESTADUAL"
-    else:
-        label_local = "📍 Localidade (Acesso Nacional Liberado)"
-        placeholder_local = "Digite BRASIL ou deixe em branco"
-        tipo_consultor = "NACIONAL"
+        if plano_final == "BRONZE":
+            label_local = "📍 Liste as 03 Cidades de Interesse"
+            placeholder_local = "Ex: Presidente Prudente, Álvares Machado..."
+            tipo_consultor = "MUNICIPAL"
+        elif plano_final in ["PRATA", "OURO"]:
+            label_local = "📍 Liste os Estados (UF) de Interesse"
+            placeholder_local = "Ex: SP, RJ, MG"
+            tipo_consultor = "ESTADUAL"
+        else:
+            label_local = "📍 Localidade (Acesso Nacional Liberado)"
+            placeholder_local = "Digite BRASIL ou deixe em branco"
+            tipo_consultor = "NACIONAL"
 
-    with st.form("form_dados_pessoais"):
-        nome = st.text_input("Nome Completo")
-        email = st.text_input("E-mail (Seu futuro usuário)")
-        senha = st.text_input("Crie uma Senha", type="password")
-        localidade = st.text_input(label_local, placeholder=placeholder_local)
-        
-        st.warning(f"⚠️ Plano selecionado: **{plano_final}** ({tipo_consultor})")
-        
-        btn_enviar = st.form_submit_button("FINALIZAR CADASTRO E SOLICITAR ACESSO")
-        
-        if btn_enviar:
-            if nome and email and senha:
-                status_inicial = "pendente" 
-                novo_usuario = [email, senha, status_inicial, plano_final, tipo_consultor, localidade]
-                
-                if salvar_cadastro_google_sheets(novo_usuario):
-                    st.success("✅ Solicitação enviada com sucesso!")
-                    enviar_aviso_email(nome, plano_final, email)
-                    link_zap = gerar_link_whatsapp(nome, plano_final)
-                    st.link_button("📱 AVISAR NO WHATSAPP", link_zap)
+        with st.form("form_dados_pessoais"):
+            nome = st.text_input("Nome Completo")
+            email = st.text_input("E-mail (Seu futuro usuário)")
+            senha = st.text_input("Crie uma Senha", type="password")
+            localidade = st.text_input(label_local, placeholder=placeholder_local)
+            
+            st.warning(f"⚠️ Plano selecionado: **{plano_final}** ({tipo_consultor})")
+            
+            btn_enviar = st.form_submit_button("PRÓXIMO PASSO: PAGAMENTO ➡️")
+            
+            if btn_enviar:
+                if nome and email and senha:
+                    status_inicial = "pendente" 
+                    novo_usuario = [email, senha, status_inicial, plano_final, tipo_consultor, localidade]
+                    
+                    if salvar_cadastro_google_sheets(novo_usuario):
+                        enviar_aviso_email(nome, plano_final, email)
+                        st.session_state['cadastro_concluido'] = True
+                        st.session_state['plano_selecionado'] = plano_final
+                        st.session_state['nome_temp'] = nome
+                        st.rerun()
+                    else:
+                        st.error("Erro técnico ao salvar na planilha.")
                 else:
-                    st.error("Erro técnico ao salvar na planilha.")
-            else:
-                st.error("Por favor, preencha Nome, E-mail e Senha.")
-
-# --- 4. NAVEGAÇÃO E LÓGICA PRINCIPAL ---
+                    st.error("Por favor, preencha Nome, E-mail e Senha.")
+    else:
+        # TELA DE PAGAMENTO (APARECE APÓS O FORMULÁRIO)
+        st.success(f"✅ Quase lá, {st.session_state['nome_temp']}! Cadastro recebido.")
+        st.subheader("💳 Ativação do Acesso")
+        st.write(f"Para liberar seu plano **{st.session_state['plano_selecionado']}**, finalize o pagamento abaixo:")
+        
+        link_mp = links_pagamento.get(st.session_state['plano_selecionado'], "")
+        
+        st.link_button(f"👉 PAGAR PLANO {st.session_state['plano_selecionado']} NO MERCADO PAGO", link_mp, type="primary")
+        
+        st.info("💡 Após o pagamento, seu acesso será liberado em até 30 minutos. Você receberá um aviso no e-mail cadastrado.")
+        
+        link_zap = gerar_link_whatsapp(st.session_state['nome_temp'], st.session_state['plano_selecionado'])
+        st.link_button("📱 JÁ PAGUEI? ENVIAR COMPROVANTE AGORA", link_zap)
 
 # --- 4. NAVEGAÇÃO E LÓGICA PRINCIPAL ---
 
@@ -145,12 +172,10 @@ def executar():
 
     if not st.session_state['logado']:
         if st.session_state['tela'] == 'home':
-            # TÍTULO PRINCIPAL
             st.markdown("<h1 style='text-align: center;'>🛰️ Core Essence</h1>", unsafe_allow_html=True)
             st.markdown("<h3 style='text-align: center; color: #555;'>Inteligência Governamental Estratégica</h3>", unsafe_allow_html=True)
             st.write("\n")
             
-            # --- OS 03 QUADROS DE MENSAGEM (REINSERIDOS AQUI) ---
             c_f1, c_f2, c_f3 = st.columns(3)
             with c_f1:
                 st.info("**Para nossos Consultores:**\n\n*Bem-vindo de volta ao centro da estratégia. Acesse seus dados abaixo.*")
@@ -161,7 +186,6 @@ def executar():
 
             st.markdown("---")
             
-            # BOTÕES DE ACESSO
             col_b1, col_b2 = st.columns(2)
             with col_b1:
                 if st.button("👤 JÁ SOU CONSULTOR (LOGIN)", use_container_width=True, type="primary"):
@@ -190,7 +214,6 @@ def executar():
                         st.error("Usuário ou senha incorretos.")
 
     else:
-        # --- ÁREA LOGADA ---
         with st.sidebar:
             st.title("Core Essence")
             plano = st.session_state.get('usuario_plano', 'BRONZE')
