@@ -101,20 +101,36 @@ def tela_cadastro():
         
         if btn_enviar:
             if nome and email and senha:
-                novo_usuario = [email, senha, plano_final, localidade, "pendente"]
+                # --- AJUSTE DA ORDEM DAS COLUNAS ---
+                # A ordem deve ser: [USUARIO, SENHA, STATUS, PLANO, TIPO_CONSULTOR, LOCALIDADE]
+                # Verifique se a sua planilha segue exatamente essa sequência:
+                
+                status_inicial = "pendente" # O status vai para a 3ª coluna
+                tipo_consultor = "CONSULTOR" # Exemplo de preenchimento para a 5ª coluna
+                
+                novo_usuario = [
+                    email,           # Coluna: usuario
+                    senha,           # Coluna: senha
+                    status_inicial,  # Coluna: status (Agora fixo como 'pendente')
+                    plano_final,     # Coluna: plano (Agora no lugar certo)
+                    tipo_consultor,  # Coluna: tipo_consultor
+                    localidade       # Coluna: localidade/local_liberado
+                ]
+                
                 if salvar_cadastro_google_sheets(novo_usuario):
                     st.success("✅ Solicitação enviada com sucesso!")
                     
-                    # 1. Tenta enviar o e-mail em segundo plano
+                    # Envia o e-mail de aviso para você
                     enviar_aviso_email(nome, plano_final, email)
                     
-                    # 2. Mostra o botão para o cliente te avisar no Zap (Garante que você veja na hora!)
+                    # Gera e mostra o botão do WhatsApp
                     link_zap = gerar_link_whatsapp(nome, plano_final)
-                    st.info("Para agilizar sua liberação, clique no botão abaixo:")
+                    st.info("Para agilizar sua liberação, clique abaixo:")
                     st.link_button("📱 AVISAR NO WHATSAPP", link_zap)
-                    
                 else:
-                    st.error("Erro técnico ao salvar.")
+                    st.error("Erro técnico ao salvar na planilha.")
+            else:
+                st.error("Preencha todos os campos obrigatórios.")
 
 # --- 4. NAVEGAÇÃO E LÓGICA PRINCIPAL ---
 def executar():
