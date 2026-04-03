@@ -9,8 +9,6 @@ from email.mime.text import MIMEText
 import urllib.parse
 from google.oauth2.service_account import Credentials
 
-st.write("O código está rodando!")
-
 # --- 1. FUNÇÕES DE APOIO (CONEXÃO GOOGLE E NOTIFICAÇÕES) ---
 
 def salvar_cadastro_google_sheets(dados_cliente):
@@ -87,7 +85,6 @@ def tela_cadastro():
         st.session_state['tela'] = 'home'
         st.rerun()
 
-    # 1. SELEÇÃO DE PLANO
     opcoes_planos = {
         "BRONZE: Acesso a até 03 Municípios + 05 Revisões": "BRONZE",
         "PRATA: Acesso a 01 Estado completo + 15 Revisões": "PRATA",
@@ -98,7 +95,6 @@ def tela_cadastro():
     escolha_visual = st.selectbox("Selecione o Plano Desejado:", list(opcoes_planos.keys()))
     plano_final = opcoes_planos[escolha_visual]
 
-    # 2. LÓGICA DINÂMICA
     if plano_final == "BRONZE":
         label_local = "📍 Liste as 03 Cidades de Interesse"
         placeholder_local = "Ex: Presidente Prudente, Álvares Machado..."
@@ -112,7 +108,6 @@ def tela_cadastro():
         placeholder_local = "Digite BRASIL ou deixe em branco"
         tipo_consultor = "NACIONAL"
 
-    # 3. FORMULÁRIO
     with st.form("form_dados_pessoais"):
         nome = st.text_input("Nome Completo")
         email = st.text_input("E-mail (Seu futuro usuário)")
@@ -126,22 +121,12 @@ def tela_cadastro():
         if btn_enviar:
             if nome and email and senha:
                 status_inicial = "pendente" 
-                
-                novo_usuario = [
-                    email,           # Coluna A: usuario
-                    senha,           # Coluna B: senha
-                    status_inicial,  # Coluna C: status
-                    plano_final,     # Coluna D: plano
-                    tipo_consultor,  # Coluna E: tipo_consultor
-                    localidade       # Coluna F: localidade
-                ]
+                novo_usuario = [email, senha, status_inicial, plano_final, tipo_consultor, localidade]
                 
                 if salvar_cadastro_google_sheets(novo_usuario):
                     st.success("✅ Solicitação enviada com sucesso!")
                     enviar_aviso_email(nome, plano_final, email)
-                    
                     link_zap = gerar_link_whatsapp(nome, plano_final)
-                    st.info("Para agilizar sua liberação, clique abaixo:")
                     st.link_button("📱 AVISAR NO WHATSAPP", link_zap)
                 else:
                     st.error("Erro técnico ao salvar na planilha.")
@@ -151,34 +136,58 @@ def tela_cadastro():
 # --- 4. NAVEGAÇÃO E LÓGICA PRINCIPAL ---
 
 def executar():
-    # 1. GARANTE QUE AS CHAVES EXISTAM NO ESTADO DA SESSÃO
     if 'logado' not in st.session_state:
         st.session_state['logado'] = False
     if 'tela' not in st.session_state:
         st.session_state['tela'] = 'home'
 
-    # 2. SE NÃO ESTIVER LOGADO, MOSTRA AS TELAS PÚBLICAS
     if not st.session_state['logado']:
         if st.session_state['tela'] == 'home':
-            # ... (seu código da home aqui)
-            st.title("🛰️ Core Essence")
-            if st.button("🚀 QUERO ME CADASTRAR"):
-                st.session_state['tela'] = 'cadastro'
-                st.rerun()
+            st.markdown("<h1 style='text-align: center;'>🛰️ Core Essence</h1>", unsafe_allow_html=True)
+            st.markdown("<h3 style='text-align: center;'>Inteligência Governamental Estratégica</h3>", unsafe_allow_html=True)
+            
+            col1, col2 = st.columns(2)
+            with col1:
+                if st.button("👤 JÁ SOU CONSULTOR (LOGIN)", use_container_width=True, type="primary"):
+                    st.session_state['tela'] = 'login'
+                    st.rerun()
+            with col2:
+                if st.button("🚀 QUERO ME CADASTRAR AGORA", use_container_width=True):
+                    st.session_state['tela'] = 'cadastro'
+                    st.rerun()
 
         elif st.session_state['tela'] == 'cadastro':
             tela_cadastro()
             
         elif st.session_state['tela'] == 'login':
-            # ... (seu código de login aqui)
-            pass
+            st.title("🔑 Acesso ao Portal")
+            if st.button("⬅️ Voltar"):
+                st.session_state['tela'] = 'home'
+                st.rerun()
+            with st.form("login_form"):
+                u = st.text_input("Usuário")
+                p = st.text_input("Senha", type="password")
+                if st.form_submit_button("Entrar"):
+                    if autenticar_usuario(u, p):
+                        st.rerun()
+                    else:
+                        st.error("Usuário ou senha incorretos.")
 
-    # 3. SE ESTIVER LOGADO, MOSTRA A ÁREA RESTRITA
     else:
-        # ... (seu código da área logada com a sidebar aqui)
-        st.sidebar.write("Bem-vindo!")
+        # --- ÁREA LOGADA ---
+        with st.sidebar:
+            st.title("Core Essence")
+            plano = st.session_state.get('usuario_plano', 'BRONZE')
+            st.info(f"🏆 Plano: {plano}")
+            menu = ["📊 Recursos", "🏛️ Radar de Emendas", "📜 Revisão", "🚪 Sair"]
+            escolha = st.radio("Módulos:", menu)
 
-# ... resto do seu código acima ...
+        if escolha == "🚪 Sair":
+            st.session_state.clear()
+            st.rerun()
+        else:
+            st.write(f"### Bem-vindo ao módulo {escolha}")
+            st.info("Selecione uma opção no menu lateral para começar.")
 
 if __name__ == "__main__":
     executar()
