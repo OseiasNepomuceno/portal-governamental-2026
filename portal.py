@@ -8,7 +8,7 @@ from email.mime.text import MIMEText
 import urllib.parse
 from google.oauth2.service_account import Credentials
 
-# --- 1. IMPORTAÇÃO DOS MÓDULOS (Nomes sincronizados com os arquivos) ---
+# --- 1. IMPORTAÇÃO DOS MÓDULOS ---
 import radar_emendas_2026  
 import recursos2026        
 import revisor_estatuto    
@@ -16,7 +16,6 @@ import revisor_estatuto
 # --- 2. FUNÇÕES DE APOIO ---
 
 def salvar_cadastro_google_sheets(dados_cliente):
-    # scope movido para dentro para evitar problemas de escopo global
     scope = ["https://www.googleapis.com/auth/spreadsheets", "https://www.googleapis.com/auth/drive"]
     try:
         nome_da_chave = 'ponto-facial-oseiascarveng-cd7b1ab54295.json'
@@ -55,10 +54,8 @@ def autenticar_usuario(usuario_digitado, senha_digitada):
         if os.path.exists(nome_arquivo): os.remove(nome_arquivo)
         gdown.download(url, nome_arquivo, quiet=True)
         df = pd.read_excel(nome_arquivo, sheet_name='usuario')
-        
         df.columns = [str(c).strip().upper() for c in df.columns]
         
-        # Filtro de login robusto
         user_row = df[(df['USUARIO'].astype(str).str.strip() == str(usuario_digitado).strip()) & 
                       (df['SENHA'].astype(str).str.strip() == str(senha_digitada).strip())]
         
@@ -66,7 +63,6 @@ def autenticar_usuario(usuario_digitado, senha_digitada):
             dados = user_row.iloc[0]
             if str(dados.get('STATUS', 'pendente')).lower().strip() == 'ativo':
                 info_usuario = dados.to_dict()
-                # Padronização de chaves para os módulos
                 info_usuario['PLANO'] = str(dados.get('PLANO', 'BRONZE')).upper().strip()
                 info_usuario['local_liberado'] = str(dados.get('LOCALIDADE', '')).upper().strip()
                 
@@ -83,7 +79,7 @@ def autenticar_usuario(usuario_digitado, senha_digitada):
 # --- 3. CONFIGURAÇÃO DA PÁGINA ---
 st.set_page_config(page_title="Core Essence | Inteligência Governamental", page_icon="🛰️", layout="wide")
 
-# --- 4. TELAS ---
+# --- 4. TELA DE CADASTRO ---
 
 def tela_cadastro():
     st.title("🚀 Cadastro de Novo Consultor")
@@ -105,8 +101,29 @@ def tela_cadastro():
         
         with st.form("form_cadastro"):
             nome = st.text_input("Nome Completo")
-            email = st.text_input("E-mail (Será seu Login)")
-            senha = st.text_input("Senha de Acesso", type="password")
-            local = st.text_input("Localidades de Interesse (Cidades ou UFs)")
+            email = st.text_input("E-mail (Login)")
+            senha = st.text_input("Senha", type="password")
+            local = st.text_input("Localidades (Cidades ou UFs)")
             
-            if st.form_submit_button("PRÓXIMO PASSO:
+            enviado = st.form_submit_button("PRÓXIMO PASSO: PAGAMENTO ➡️")
+            
+            if enviado:
+                if nome and email and senha:
+                    sucesso = salvar_cadastro_google_sheets([email, senha, 'pendente', plano_f, 'CONSULTOR', local])
+                    if sucesso:
+                        enviar_aviso_email(nome, plano_f, email)
+                        st.session_state['cadastro_concluido'] = True
+                        st.session_state['plano_selecionado'] = plano_f
+                        st.session_state['nome_temp'] = nome
+                        st.rerun()
+                else:
+                    st.error("Preencha todos os campos obrigatórios.")
+    else:
+        st.success(f"✅ Cadastro recebido, {st.session_state['nome_temp']}!")
+        st.link_button(f"💳 PAGAR PLANO {st.session_state['plano_selecionado']}", links_pagamento.get(st.session_state['plano_selecionado'], ""), use_container_width=True)
+        st.info("Após o pagamento, seu acesso será liberado em até 30 min.")
+
+# --- 5. NAVEGAÇÃO E LÓGICA PRINCIPAL ---
+
+def executar():
+    if 'logado' not in st.session_state: st.session_state['logado'] =
