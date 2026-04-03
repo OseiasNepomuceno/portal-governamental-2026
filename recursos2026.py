@@ -3,7 +3,7 @@ import pandas as pd
 import gdown
 import os
 
-# Dicionário de tradução exata para a coluna "UF" da sua base
+# Dicionário para exibição no menu lateral
 DE_PARA_UF = {
     'AC': 'ACRE', 'AL': 'ALAGOAS', 'AP': 'AMAPA', 'AM': 'AMAZONAS', 'BA': 'BAHIA',
     'CE': 'CEARA', 'DF': 'DISTRITO FEDERAL', 'ES': 'ESPIRITO SANTO', 'GO': 'GOIAS',
@@ -18,7 +18,6 @@ def limpar_valor(v):
     if pd.isna(v) or str(v).strip() in ["", "0"]: 
         return 0.0
     try:
-        # Converte R$ 1.234,56 para 1234.56
         v = str(v).upper().replace('R$', '').replace(' ', '').replace('.', '').replace(',', '.').strip()
         return float(v)
     except: 
@@ -43,10 +42,9 @@ def exibir_recursos():
     # --- DADOS DO USUÁRIO ---
     nome_usuario = str(usuario.get('NOME') or usuario.get('USUARIO') or "Consultor").upper()
     plano = str(usuario.get('PLANO', 'BÁSICO')).upper()
-    uf_sigla = str(usuario.get('UF_LIBERADA') or usuario.get('UF') or "").strip().upper()
+    uf_sigla = str(usuario.get('UF_LIBERADA') or usuario.get('UF') or "RJ").strip().upper()
     
-    # Traduz para o nome por extenso que está na sua base (ex: RIO DE JANEIRO)
-    uf_nome_completo = DE_PARA_UF.get(uf_sigla, uf_sigla)
+    uf_nome_menu = DE_PARA_UF.get(uf_sigla, uf_sigla)
     acesso_nacional = (plano == "PREMIUM" or uf_sigla == "BRASIL")
 
     # --- MENU LATERAL ---
@@ -58,10 +56,10 @@ def exibir_recursos():
             st.success("✅ **PLANO:** PREMIUM (NACIONAL)")
         else:
             st.warning(f"💼 **PLANO:** BÁSICO (ESTADUAL)")
-            st.write(f"📍 **UF LIBERADA:** {uf_nome_completo}")
+            st.write(f"📍 **UF LIBERADA:** {uf_nome_menu}")
         st.divider()
 
-    # --- DEFINIÇÃO DAS COLUNAS EXATAS (Baseado no seu Diagnóstico) ---
+    # Colunas exatas conforme o diagnóstico anterior
     colunas_finais = [
         "Ano da Emenda", 
         "Tipo de Emenda", 
@@ -75,7 +73,6 @@ def exibir_recursos():
     lista_final = []
     
     try:
-        # Leitura por blocos para não travar
         reader = pd.read_csv(nome_arquivo, sep=None, engine='python', encoding='latin1', on_bad_lines='skip', chunksize=150000)
         
         for chunk in reader:
@@ -85,15 +82,18 @@ def exibir_recursos():
             
             if chunk.empty: continue
 
-            # 2. Filtro de UF (Apenas se for Plano Básico)
+            # 2. FILTRO DE BUSCA POR SIGLA DENTRO DA LOCALIDADE (Ex: buscar "RJ")
             if not acesso_nacional:
-                if "UF" in chunk.columns:
-                    chunk = chunk[chunk["UF"].astype(str).str.upper() == uf_nome_completo]
+                col_loc = "Localidade de aplicação do recurso"
+                if col_loc in chunk.columns:
+                    # Busca a sigla do estado (ex: "RJ") dentro da frase da localidade
+                    # Isso garante que pegue "NITERÓI - RJ", "RIO DE JANEIRO - RJ", etc.
+                    termo_busca = f"- {uf_sigla}" # Busca o padrão " - RJ"
+                    chunk = chunk[chunk[col_loc].astype(str).str.upper().str.contains(uf_sigla, na=False)]
 
             if chunk.empty: continue
 
-            # 3. Seleção das colunas exatas que você pediu (Sem códigos)
-            # Verificamos se as colunas existem antes de selecionar
+            # 3. Seleção das colunas
             cols_existentes = [c for c in colunas_finais if c in chunk.columns]
             lista_final.append(chunk[cols_existentes].copy())
 
@@ -104,13 +104,12 @@ def exibir_recursos():
         return
 
     if df_base.empty:
-        st.warning(f"Nenhum dado encontrado para {uf_nome_completo} em 2026.")
+        st.warning(f"Nenhum dado encontrado contendo '{uf_sigla}' na localidade em 2026.")
         return
 
     # --- MÉTRICAS ---
-    # Usamos os nomes exatos do seu diagnóstico para a soma
     m1, m2 = st.columns(2)
-    label_local = "BRASIL" if acesso_nacional else uf_nome_completo
+    label_local = "BRASIL" if acesso_nacional else uf_nome_menu
     
     if "Valor Empenhado" in df_base.columns:
         v_e = df_base["Valor Empenhado"].apply(limpar_valor).sum()
@@ -121,6 +120,4 @@ def exibir_recursos():
         m2.metric(f"Total Pago ({label_local})", f"R$ {v_p:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.'))
     
     st.markdown("---") 
-    
-    # Exibe a planilha final com os títulos corretos
     st.dataframe(df_base, use_container_width=True)
