@@ -3,7 +3,7 @@ import pandas as pd
 import gdown
 import os
 
-# Dicionário para converter Sigla do Plano em Nome Completo da Base de Dados
+# Dicionário de conversão (Sigla -> Nome na Base)
 DE_PARA_UF = {
     'AC': 'ACRE', 'AL': 'ALAGOAS', 'AP': 'AMAPA', 'AM': 'AMAZONAS', 'BA': 'BAHIA',
     'CE': 'CEARA', 'DF': 'DISTRITO FEDERAL', 'ES': 'ESPIRITO SANTO', 'GO': 'GOIAS',
@@ -18,7 +18,6 @@ def limpar_valor(v):
     if pd.isna(v) or str(v).strip() in ["", "0"]: 
         return 0.0
     try:
-        # Padronização financeira: R$ 1.234,56 -> 1234.56
         v = str(v).upper().replace('R$', '').replace(' ', '').replace('.', '').replace(',', '.').strip()
         return float(v)
     except: 
@@ -40,96 +39,91 @@ def exibir_recursos():
         st.error("Usuário não logado.")
         return
 
-    # --- IDENTIFICAÇÃO E REGRAS DE PLANO ---
+    # --- DADOS DO USUÁRIO ---
     nome_usuario = str(usuario.get('NOME') or usuario.get('USUARIO') or "Consultor").upper()
     plano = str(usuario.get('PLANO', 'BÁSICO')).upper()
     uf_sigla = str(usuario.get('UF_LIBERADA') or usuario.get('UF') or "").strip().upper()
-
-    # Traduz a sigla para o nome que está na coluna UF da base (Ex: RJ -> RIO DE JANEIRO)
     uf_nome_completo = DE_PARA_UF.get(uf_sigla, uf_sigla)
     
-    # Se for PREMIUM ou a UF for BRASIL, ignora o filtro de estado
     acesso_nacional = (plano == "PREMIUM" or uf_sigla == "BRASIL")
 
-    # --- MENU LATERAL (ESQUERDO) ---
+    # --- MENU LATERAL ---
     with st.sidebar:
         st.divider()
         st.markdown("### 👤 Área do Consultor")
         st.info(f"**LOGIN:** {nome_usuario}")
-        
         if acesso_nacional:
             st.success("✅ **PLANO:** PREMIUM (NACIONAL)")
         else:
             st.warning(f"💼 **PLANO:** BÁSICO (ESTADUAL)")
-            st.write(f"📍 **UF LIBERADA:** {uf_nome_completo}")
+            st.write(f"📍 **UF:** {uf_nome_completo}")
         st.divider()
 
-    # Colunas alvo para exibição
-    alvos = ['ANO DA EMENDA', 'TIPO DA EMENDA', 'AUTOR', 'MUNICÍPIO', 'UF', 'EMPENHADO', 'LIQUIDADO', 'PAGO']
+    # Nomes flexíveis para encontrar as colunas mesmo com acentos
+    alvos = ['ANO', 'TIPO', 'AUTOR', 'MUNICÍPIO', 'MUNICIPIO', 'UF', 'EMPENHADO', 'PAGO']
     lista_final = []
     
     try:
-        # Processamento por partes (chunks) para garantir performance
-        reader = pd.read_csv(nome_arquivo, sep=None, engine='python', encoding='latin1', on_bad_lines='skip', chunksize=100000)
+        # Aumentei o chunksize para garantir que ele pegue mais dados por vez
+        reader = pd.read_csv(nome_arquivo, sep=None, engine='python', encoding='latin1', on_bad_lines='skip', chunksize=150000)
         
         for chunk in reader:
-            # Padroniza nomes de colunas
-            chunk.columns = [str(c).upper().strip() for c in chunk.columns]
+            # Mantém os nomes originais para busca, mas cria uma versão upper para comparar
+            cols_originais = chunk.columns
+            cols_upper = [str(c).upper().strip() for c in cols_originais]
+            chunk.columns = cols_upper # Padroniza temporariamente
             
-            # 1. FILTRO POR ANO (2026)
+            # 1. FILTRO ANO 2026
             col_ano = next((c for c in chunk.columns if 'ANO' in c), None)
             if col_ano:
                 chunk = chunk[chunk[col_ano].astype(str).str.contains('2026', na=False)]
             
             if chunk.empty: continue
 
-            # 2. FILTRO POR UF (Extração baseada na coluna UF da Base de Dados)
+            # 2. FILTRO POR UF (RIGOROSO)
             if not acesso_nacional:
-                # Localiza a coluna exata 'UF' no CSV
-                col_uf_base = next((c for c in chunk.columns if c == 'UF' or (len(c) == 2 and 'UF' in c)), None)
+                # Busca a coluna UF exata
+                col_uf_base = next((c for c in chunk.columns if c == 'UF'), None)
                 if col_uf_base:
-                    # Filtra apenas o Estado correspondente ao Plano Básico
                     chunk = chunk[chunk[col_uf_base].astype(str).str.upper() == uf_nome_completo]
 
             if chunk.empty: continue
 
-            # 3. SELEÇÃO DE COLUNAS PARA A TABELA
-            cols_ok = []
-            for a in alvos:
-                encontrada = next((c for c in chunk.columns if a in c and 'COD' not in c and 'IBGE' not in c), None)
-                if encontrada: cols_ok.append(encontrada)
+            # 3. SELEÇÃO DE COLUNAS (Incluindo 'Município' com acento)
+            cols_para_exibir = []
+            for item in ['ANO', 'TIPO', 'AUTOR', 'MUNICÍPIO', 'UF', 'EMPENHADO', 'PAGO']:
+                # Busca qualquer coluna que contenha a palavra chave (ex: encontra 'Município' se buscar 'MUNICÍPIO')
+                encontrada = next((c for c in chunk.columns if item in c and 'COD' not in c), None)
+                if encontrada:
+                    cols_para_exibir.append(encontrada)
             
-            if cols_ok:
-                lista_final.append(chunk[list(dict.fromkeys(cols_ok))].copy())
+            if cols_para_exibir:
+                lista_final.append(chunk[list(dict.fromkeys(cols_para_exibir))].copy())
 
-        # Consolida os dados filtrados
         df_base = pd.concat(lista_final, ignore_index=True) if lista_final else pd.DataFrame()
 
     except Exception as e:
-        st.error(f"Erro ao processar a planilha: {e}")
+        st.error(f"Erro técnico: {e}")
         return
 
-    # --- EXIBIÇÃO LADO DIREITO (DASHBOARD E TABELA) ---
     if df_base.empty:
-        st.warning(f"Atenção: Nenhum registro de 2026 encontrado na coluna UF para: {uf_nome_completo}")
+        st.warning(f"Nenhum dado encontrado para: {uf_nome_completo}")
         return
 
-    # Busca colunas financeiras para o cálculo das métricas
+    # --- MÉTRICAS E TABELA ---
+    # Identifica colunas financeiras para soma
     col_p = next((c for c in df_base.columns if 'PAGO' in c), None)
     col_e = next((c for c in df_base.columns if 'EMPENHADO' in c), None)
 
-    # Métricas Superiores
     m1, m2 = st.columns(2)
-    label_local = "BRASIL" if acesso_nacional else uf_nome_completo
+    label = "BRASIL" if acesso_nacional else uf_nome_completo
     
     if col_e:
-        v_e = df_base[col_e].apply(limpar_valor).sum()
-        m1.metric(f"Total Empenhado ({label_local})", f"R$ {v_e:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.'))
+        total_e = df_base[col_e].apply(limpar_valor).sum()
+        m1.metric(f"Total Empenhado ({label})", f"R$ {total_e:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.'))
     if col_p:
-        v_p = df_base[col_p].apply(limpar_valor).sum()
-        m2.metric(f"Total Pago ({label_local})", f"R$ {v_p:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.'))
+        total_p = df_base[col_p].apply(limpar_valor).sum()
+        m2.metric(f"Total Pago ({label})", f"R$ {total_p:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.'))
     
     st.markdown("---") 
-    
-    # Exibição da Planilha Filtrada
     st.dataframe(df_base, use_container_width=True)
