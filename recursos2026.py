@@ -59,8 +59,9 @@ def exibir_recursos():
             st.write(f"📍 **UF:** {uf_nome_completo}")
         st.divider()
 
-    # Termos permitidos (Trocado Município por Localidade de Aplicação)
-    termos_limpos = ['ANO', 'TIPO', 'AUTOR', 'LOCALIDADE DE APLICAÇÃO', 'UF', 'EMPENHADO', 'PAGO']
+    # LISTA DE PRIORIDADE (Damos preferência à Localidade)
+    # Removi 'MUNICÍPIO' da lista principal para forçar a Localidade
+    termos_desejados = ['ANO', 'TIPO', 'AUTOR', 'LOCALIDADE', 'UF', 'EMPENHADO', 'PAGO']
     lista_final = []
     
     try:
@@ -79,4 +80,42 @@ def exibir_recursos():
             # 2. FILTRO POR UF
             if not acesso_nacional:
                 col_uf_base = next((c for c in chunk.columns if c == 'UF'), None)
-                if
+                if col_uf_base:
+                    chunk = chunk[chunk[col_uf_base].astype(str).str.upper() == uf_nome_completo]
+
+            if chunk.empty: continue
+
+            # 3. SELEÇÃO DE COLUNAS COM TRAVA DE EXCLUSÃO
+            cols_selecionadas = []
+            for t in termos_desejados:
+                # Busca coluna que contenha o termo, BLOQUEANDO MUNICÍPIO E CÓDIGOS
+                encontrada = next((c for c in chunk.columns if t in c 
+                                  and 'COD' not in c 
+                                  and 'ID' not in c 
+                                  and 'IBGE' not in c), None)
+                if encontrada:
+                    cols_selecionadas.append(encontrada)
+            
+            # Se por acaso 'LOCALIDADE' não existir na base, aí sim buscamos Município como reserva
+            if not any('LOCALIDADE' in c for c in cols_selecionadas):
+                reserva = next((c for c in chunk.columns if 'MUNICÍPIO' in c and 'COD' not in c), None)
+                if reserva: cols_selecionadas.append(reserva)
+
+            if cols_selecionadas:
+                lista_final.append(chunk[list(dict.fromkeys(cols_selecionadas))].copy())
+
+        df_base = pd.concat(lista_final, ignore_index=True) if lista_final else pd.DataFrame()
+
+    except Exception as e:
+        st.error(f"Erro técnico: {e}")
+        return
+
+    if df_base.empty:
+        st.warning(f"Nenhum dado encontrado para: {uf_nome_completo}")
+        return
+
+    # --- MÉTRICAS ---
+    col_p = next((c for c in df_base.columns if 'PAGO' in c), None)
+    col_e = next((c for c in df_base.columns if 'EMPENHADO' in c), None)
+
+    m
