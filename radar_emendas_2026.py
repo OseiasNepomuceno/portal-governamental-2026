@@ -74,21 +74,23 @@ def exibir_radar():
         df = df.drop(columns=['UF_AUX'])
         st.info(f"📍 Exibindo: **{nome_completo_busca}**")
 
-    # --- 4. CÁLCULO E EXIBIÇÃO DOS CARDS FINANCEIROS (SOMENTE NA VISÃO GERAL) ---
-    if not df.empty and tipo_visao == "Visão Geral":
+    # --- 4. CÁLCULO E EXIBIÇÃO DOS CARDS FINANCEIROS (CORREÇÃO APLICADA) ---
+    # Só entra aqui se for Visão Geral. Se for Favorecido, o bloco é ignorado.
+    if tipo_visao == "Visão Geral" and not df.empty:
         col_emp = next((c for c in df.columns if "EMPENHADO" in c), None)
         col_liq = next((c for c in df.columns if "LIQUIDADO" in c), None)
         col_pag = next((c for c in df.columns if "PAGO" in c), None)
 
         def limpar_valor(col):
-            if col in df.columns:
+            if col and col in df.columns:
                 return pd.to_numeric(df[col].astype(str).str.replace('.', '', regex=False).str.replace(',', '.', regex=False), errors='coerce').sum()
             return 0.0
 
-        v_empenhado = limpar_valor(col_emp) if col_emp else 0.0
-        v_liquidado = limpar_valor(col_liq) if col_liq else 0.0
-        v_pago = limpar_valor(col_pag) if col_pag else 0.0
+        v_empenhado = limpar_valor(col_emp)
+        v_liquidado = limpar_valor(col_liq)
+        v_pago = limpar_valor(col_pag)
 
+        # Renderização dos cards
         c1, c2, c3 = st.columns(3)
         with c1:
             st.markdown('<div style="border-left: 5px solid #007bff; padding-left: 10px;"><b>VALOR EMPENHADO</b></div>', unsafe_allow_html=True)
