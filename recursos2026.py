@@ -2,8 +2,9 @@ import streamlit as st
 import pandas as pd
 import gdown
 import os
+from datetime import datetime
 
-# Tradução para interface e filtros
+# Dicionário de tradução para interface
 DE_PARA_UF = {
     'AC': 'ACRE', 'AL': 'ALAGOAS', 'AP': 'AMAPA', 'AM': 'AMAZONAS', 'BA': 'BAHIA',
     'CE': 'CEARA', 'DF': 'DISTRITO FEDERAL', 'ES': 'ESPIRITO SANTO', 'GO': 'GOIAS',
@@ -27,11 +28,10 @@ def exibir_recursos():
     st.title("📊 Radar de Recursos 2026")
     
     file_id = st.secrets.get("file_id_convenios")
-    # NOME AJUSTADO COM ACENTO CONFORME O DRIVE
     nome_arquivo = "20260320_Convênios.csv"
 
     if not os.path.exists(nome_arquivo):
-        with st.spinner("Sincronizando Base de Recursos do Drive..."):
+        with st.spinner("Sincronizando Base de Convênios..."):
             url = f'https://drive.google.com/uc?id={file_id}'
             gdown.download(url, nome_arquivo, quiet=False, fuzzy=True)
 
@@ -40,11 +40,10 @@ def exibir_recursos():
         st.error("Usuário não logado.")
         return
 
-    # --- LÓGICA DE USUÁRIO ---
+    # --- LÓGICA DE PERMISSÃO ---
     nome_usuario = str(usuario.get('NOME') or usuario.get('USUARIO') or "Consultor").upper()
     plano = str(usuario.get('PLANO', 'BÁSICO')).upper()
     uf_sigla = str(usuario.get('UF_LIBERADA') or usuario.get('UF') or "RJ").strip().upper()
-    
     uf_nome_completo = DE_PARA_UF.get(uf_sigla, uf_sigla)
     acesso_nacional = (plano == "PREMIUM" or uf_sigla == "BRASIL")
 
@@ -55,80 +54,96 @@ def exibir_recursos():
         st.info(f"**LOGIN:** {nome_usuario}")
         if acesso_nacional:
             st.success("✅ **PLANO:** PREMIUM (NACIONAL)")
-            label_scope = "BRASIL"
         else:
             st.warning(f"💼 **PLANO:** BÁSICO (ESTADUAL)")
             st.write(f"📍 **UF:** {uf_nome_completo}")
-            label_scope = uf_nome_completo
         st.divider()
 
-    # Colunas esperadas na planilha de recursos
+    # --- COLUNAS SOLICITADAS ---
     colunas_finais = [
-        "Ano da Emenda", 
-        "Tipo de Emenda", 
-        "Nome do Autor da Emenda", 
-        "Localidade de aplicação do recurso", 
-        "UF", 
-        "Valor Empenhado", 
-        "Valor Liquidado", 
-        "Valor Pago"
+        "UF", "NOME MUNICÍPIO", "SITUAÇÃO CONVÊNIO", "OBJETO DO CONVÊNIO", 
+        "NOME ÓRGÃO SUPERIOR", "NOME CONVENENTE", "VALOR CONVÊNIO", 
+        "VALOR LIBERADO", "DATA PUBLICAÇÃO", "DATA INÍCIO VIGÊNCIA", "DATA FINAL VIGÊNCIA"
     ]
     
-    lista_final = []
-    
     try:
-        # Leitura com engine python para suportar acentuação no nome do arquivo e encoding latin1
-        reader = pd.read_csv(
-            nome_arquivo, 
-            sep=None, 
-            engine='python', 
-            encoding='latin1', 
-            on_bad_lines='skip', 
-            chunksize=150000
-        )
+        # Leitura inicial para carregar os dados
+        lista_dados = []
+        reader = pd.read_csv(nome_arquivo, sep=None, engine='python', encoding='latin1', on_bad_lines='skip', chunksize=150000)
         
         for chunk in reader:
-            # 1. Filtro Ano 2026
-            if "Ano da Emenda" in chunk.columns:
-                chunk = chunk[chunk["Ano da Emenda"].astype(str).str.contains('2026', na=False)]
+            # 1. Filtro Travado: DATA PUBLICAÇÃO contém 2026
+            col_pub = next((c for c in chunk.columns if "DATA PUBLICAÇÃO" in c.upper()), None)
+            if col_pub:
+                chunk = chunk[chunk[col_pub].astype(str).str.contains('2026', na=False)]
             
             if chunk.empty: continue
 
-            # 2. Filtro Localidade (Plano Básico)
+            # 2. Filtro de UF (Apenas se não for Premium)
             if not acesso_nacional:
-                col_loc = "Localidade de aplicação do recurso"
-                col_uf = "UF"
-                cond_loc = chunk[col_loc].astype(str).str.upper().str.contains(uf_sigla, na=False)
-                cond_uf = chunk[col_uf].astype(str).str.upper() == uf_nome_completo
-                chunk = chunk[cond_loc | cond_uf]
+                col_uf = next((c for c in chunk.columns if c.upper() == "UF"), None)
+                if col_uf:
+                    chunk = chunk[chunk[col_uf].astype(str).str.upper() == uf_sigla]
 
             if chunk.empty: continue
 
-            # 3. Seleção das Colunas
-            cols_atuais = [c for c in colunas_finais if c in chunk.columns]
-            lista_final.append(chunk[cols_atuais].copy())
+            # Padronização de nomes de colunas para seleção
+            chunk.columns = [c.upper().strip() for c in chunk.columns]
+            # Mapeia "MUNICIPIO" sem acento para "NOME MUNICÍPIO" se necessário
+            if "MUNICIPIO" in chunk.columns and "NOME MUNICÍPIO" not in chunk.columns:
+                chunk = chunk.rename(columns={"MUNICIPIO": "NOME MUNICÍPIO"})
 
-        df_base = pd.concat(lista_final, ignore_index=True) if lista_final else pd.DataFrame()
+            # Seleciona apenas o que existe das colunas solicitadas
+            cols_disponiveis = [c for c in colunas_finais if c in chunk.columns]
+            lista_dados.append(chunk[cols_disponiveis].copy())
+
+        df_full = pd.concat(lista_dados, ignore_index=True) if lista_dados else pd.DataFrame()
 
     except Exception as e:
-        st.error(f"Erro na leitura do arquivo '{nome_arquivo}': {e}")
+        st.error(f"Erro ao processar base: {e}")
         return
 
-    if df_base.empty:
-        st.warning(f"Nenhum registro de 2026 encontrado para {label_scope}.")
+    if df_full.empty:
+        st.warning("Nenhum convênio publicado em 2026 encontrado para os critérios selecionados.")
         return
+
+    # --- CONVERSÃO DE DATAS PARA FILTROS NO TOPO ---
+    for col_data in ["DATA INÍCIO VIGÊNCIA", "DATA FINAL VIGÊNCIA"]:
+        if col_data in df_full.columns:
+            df_full[col_data] = pd.to_datetime(df_full[col_data], errors='coerce', dayfirst=True)
+
+    # --- FILTROS NO TOPO (LADO DIREITO) ---
+    st.markdown("### 🔍 Filtros de Vigência")
+    c1, c2 = st.columns(2)
+    
+    with c1:
+        data_inicio = st.date_input("Início da Vigência a partir de:", value=None)
+    with c2:
+        data_fim = st.date_input("Final da Vigência até:", value=None)
+
+    # Aplicação dos filtros de data
+    if data_inicio:
+        df_full = df_full[df_full["DATA INÍCIO VIGÊNCIA"] >= pd.Timestamp(data_inicio)]
+    if data_fim:
+        df_full = df_full[df_full["DATA FINAL VIGÊNCIA"] <= pd.Timestamp(data_fim)]
 
     # --- MÉTRICAS ---
-    m1, m2, m3 = st.columns(3)
+    v_conv = df_full["VALOR CONVÊNIO"].apply(limpar_valor).sum() if "VALOR CONVÊNIO" in df_full.columns else 0
+    v_lib = df_full["VALOR LIBERADO"].apply(limpar_valor).sum() if "VALOR LIBERADO" in df_full.columns else 0
     
-    v_e = df_base["Valor Empenhado"].apply(limpar_valor).sum() if "Valor Empenhado" in df_base.columns else 0
-    v_l = df_base["Valor Liquidado"].apply(limpar_valor).sum() if "Valor Liquidado" in df_base.columns else 0
-    v_p = df_base["Valor Pago"].apply(limpar_valor).sum() if "Valor Pago" in df_base.columns else 0
+    m1, m2 = st.columns(2)
+    m1.metric("Soma Valor Convênio", f"R$ {v_conv:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.'))
+    m2.metric("Soma Valor Liberado", f"R$ {v_lib:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.'))
+
+    st.divider()
+
+    # --- PLANILHA FINAL ---
+    st.write(f"Exibindo **{len(df_full)}** registros filtrados.")
     
-    m1.metric("Total Empenhado", f"R$ {v_e:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.'))
-    m2.metric("Total Liquidado", f"R$ {v_l:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.'))
-    m3.metric("Total Pago", f"R$ {v_p:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.'))
-    
-    st.markdown("---") 
-    st.write(f"Exibindo **{len(df_base)}** registros encontrados.")
-    st.dataframe(df_base, use_container_width=True)
+    # Formata datas para exibição bonita (DD/MM/AAAA)
+    df_display = df_full.copy()
+    for col in ["DATA INÍCIO VIGÊNCIA", "DATA FINAL VIGÊNCIA"]:
+        if col in df_display.columns:
+            df_display[col] = df_display[col].dt.strftime('%d/%m/%Y')
+
+    st.dataframe(df_display, use_container_width=True, hide_index=True)
