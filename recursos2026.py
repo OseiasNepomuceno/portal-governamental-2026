@@ -1,4 +1,4 @@
-# Arquivo Final - Core Essence - Debug de Permissões - 03/04/2026
+# Arquivo Final - Core Essence - Compatibilidade Total - 03/04/2026
 import streamlit as st
 import pandas as pd
 import gdown
@@ -7,6 +7,7 @@ import unicodedata
 
 def normalizar_texto(texto):
     if pd.isna(texto) or texto is None: return ""
+    # Remove acentos e espaços extras nas pontas
     nfkd_form = unicodedata.normalize('NFKD', str(texto).strip().upper())
     return "".join([c for c in nfkd_form if not unicodedata.combining(c)])
 
@@ -27,55 +28,47 @@ def exibir_recursos():
         with st.spinner("Baixando base de dados..."):
             gdown.download(f'https://drive.google.com/uc?id={file_id}', nome_arquivo, quiet=True)
 
-    # --- DIAGNÓSTICO DO USUÁRIO ---
     usuario = st.session_state.get('usuario_logado')
-    
     if not usuario:
-        st.error("⚠️ Erro: Usuário não identificado no sistema. Por favor, saia e faça o login novamente.")
+        st.error("Usuário não identificado.")
         return
 
-    # Tentativa flexível de pegar o local liberado (evita erro de nome de coluna)
-    # Ele tenta 'local_liberado', 'LOCAL_LIBERADO', 'LOCAL' ou 'Cidades'
-    locais_bruto = usuario.get('local_liberado') or usuario.get('LOCAL_LIBERADO') or usuario.get('LOCAL') or ""
+    # --- PREPARAÇÃO DOS TERMOS ---
+    locais_bruto = usuario.get('local_liberado') or usuario.get('LOCAL_LIBERADO') or ""
+    # Limpa espaços e acentos dos termos que vêm do seu cadastro de usuários
+    termos_busca = [normalizar_texto(c) for c in str(locais_bruto).split(',') if c.strip()]
     
-    plano = str(usuario.get('PLANO', 'BRONZE')).upper()
-    permitidos_norm = [normalizar_texto(c) for c in str(locais_bruto).split(',') if c.strip()]
-    
-    # Se ainda estiver vazio, o código para aqui e te avisa o que tem dentro do 'usuario'
-    if not permitidos_norm and plano != "OURO" and plano != "ADMIN":
-        st.error("❌ Permissão de local não encontrada no seu cadastro.")
-        with st.expander("Clique aqui para ver os dados do seu login (Debug)"):
-            st.write(usuario)
+    if not termos_busca:
+        st.warning("Nenhum local de busca definido para este usuário.")
         return
-
-    mapeamento_uf = {'RIO DE JANEIRO': 'RJ', 'SAO PAULO': 'SP', 'MINAS GERAIS': 'MG', 'ESPIRITO SANTO': 'ES'}
-    siglas_permitidas = [mapeamento_uf.get(p, p) for p in permitidos_norm]
 
     lista_pedacos = []
     
     try:
         status = st.empty()
+        # Lendo com engine 'python' e sep=None para ele ADIVINHAR se é vírgula ou ponto-e-vírgula
         reader = pd.read_csv(nome_arquivo, sep=None, engine='python', encoding='latin1', 
                              on_bad_lines='skip', chunksize=60000)
         
         for i, chunk in enumerate(reader):
-            status.info(f"Lendo parte {i+1} da base de dados...")
+            status.info(f"Processando bloco {i+1}...")
+            
+            # Normaliza os nomes das colunas (tira acento de 'Município')
             chunk.columns = [normalizar_texto(c) for c in chunk.columns]
             
             col_mun = next((c for c in chunk.columns if 'MUNICI' in c), None)
             col_uf = next((c for c in chunk.columns if c in ['UF', 'ESTADO', 'SIGLA_UF']), 'UF')
 
             if col_mun:
-                chunk['MUN_BUSCA'] = chunk[col_mun].apply(normalizar_texto)
-                chunk['UF_BUSCA'] = chunk[col_uf].apply(normalizar_texto)
+                # Criamos a busca 'Contém' (case-insensitive e sem acento)
+                # O regex=True permite buscar vários nomes de uma vez
+                padrao_regex = '|'.join(termos_busca)
                 
-                if "BRONZE" in plano:
-                    chunk_f = chunk[chunk['MUN_BUSCA'].isin(permitidos_norm)].copy()
-                elif "PRATA" in plano:
-                    mask = (chunk['UF_BUSCA'].isin(permitidos_norm)) | (chunk['UF_BUSCA'].isin(siglas_permitidas))
-                    chunk_f = chunk[mask].copy()
-                else:
-                    chunk_f = chunk.copy()
+                # Criamos uma coluna temporária no chunk para busca sem acentos
+                chunk['MUN_TEMP'] = chunk[col_mun].astype(str).apply(normalizar_texto)
+                
+                # Filtra: Se o nome da cidade no CSV (sem acento) contém algum dos termos buscados
+                chunk_f = chunk[chunk['MUN_TEMP'].str.contains(padrao_regex, na=False)].copy()
 
                 if not chunk_f.empty:
                     lista_pedacos.append(chunk_f)
@@ -84,26 +77,21 @@ def exibir_recursos():
         df_base = pd.concat(lista_pedacos, ignore_index=True) if lista_pedacos else pd.DataFrame()
 
     except Exception as e:
-        st.error(f"Erro no processamento: {e}")
+        st.error(f"Erro na leitura do arquivo: {e}")
         return
 
     if df_base.empty:
-        st.warning(f"Nenhum dado encontrado para: {permitidos_norm}")
+        st.error(f"❌ Nenhum dado encontrado para: {termos_busca}")
+        st.info("Verifique se as cidades no CSV estão escritas de forma similar.")
         return
 
-    # --- EXIBIÇÃO ---
+    # --- LIMPEZA E EXIBIÇÃO ---
     col_valor = next((c for c in df_base.columns if 'VALOR' in c), None)
     if col_valor:
         df_base['VALOR_NUM'] = df_base[col_valor].apply(limpar_valor_monetario)
 
-    st.markdown("### 🔍 Pesquisa")
-    termo = st.text_input("Buscar Favorecido ou Objeto:")
+    st.metric("Total Localizado", f"R$ {df_base['VALOR_NUM'].sum():,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.'))
     
-    df_f = df_base.copy()
-    if termo:
-        termo_n = normalizar_texto(termo)
-        mask = df_f.astype(str).apply(lambda x: x.str.upper().str.contains(termo_n)).any(axis=1)
-        df_f = df_f[mask]
-
-    st.metric("Total", f"R$ {df_f['VALOR_NUM'].sum():,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.'))
-    st.dataframe(df_f.drop(columns=['MUN_BUSCA', 'UF_BUSCA', 'VALOR_NUM'], errors='ignore'), use_container_width=True)
+    # Remove as colunas de controle interno
+    cols_display = [c for c in df_base.columns if c not in ['MUN_TEMP', 'VALOR_NUM']]
+    st.dataframe(df_base[cols_display], use_container_width=True)
