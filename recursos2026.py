@@ -37,24 +37,31 @@ def exibir_recursos():
     # --- IDENTIFICAÇÃO DO USUÁRIO NO MENU LATERAL ---
     with st.sidebar:
         st.divider()
-        st.markdown("### 👤 Identificação")
+        st.markdown("### 👤 Perfil de Acesso")
         
-        # Tenta buscar o nome ou login do dicionário do usuário
+        # Nome/Login
         nome_display = usuario.get('NOME') or usuario.get('USUARIO') or "Usuário"
         st.info(f"**Login:** {nome_display}")
         
-        # Exibe o Plano
+        # Plano
         plano_display = str(usuario.get('PLANO', 'BRONZE')).upper()
         st.success(f"**Plano:** {plano_display}")
+
+        # NOVO: Tipo de Consultor
+        tipo_consultor = usuario.get('TIPO_CONSULTOR') or usuario.get('TIPO') or "Não Informado"
+        st.warning(f"**Consultor:** {tipo_consultor}")
+
+        # NOVO: Local Liberado
+        locais_bruto = usuario.get('local_liberado') or usuario.get('LOCAL_LIBERADO') or "Nenhum"
+        st.write(f"📍 **Locais:** {locais_bruto}")
+        
         st.divider()
 
     # CONFIGURAÇÃO DE COLUNAS (Foco em nomes, sem códigos)
     alvos = ['ANO DA EMENDA', 'TIPO DA EMENDA', 'AUTOR', 'MUNICÍPIO', 'UF', 'EMPENHADO', 'LIQUIDADO', 'PAGO']
 
-    locais_bruto = usuario.get('local_liberado', '')
     locais_limpos = [c.strip().upper() for c in str(locais_bruto).split(',') if c.strip()]
-    plano = str(usuario.get('PLANO', 'BRONZE')).upper()
-    ver_tudo = "BRASIL" in locais_limpos or plano in ["OURO", "ADMIN", "MASTER"]
+    ver_tudo = "BRASIL" in locais_limpos or plano_display in ["OURO", "ADMIN", "MASTER"]
 
     lista_final = []
     
@@ -107,7 +114,6 @@ def exibir_recursos():
     col_p = next((c for c in df_base.columns if 'PAGO' in c), None)
     col_e = next((c for c in df_base.columns if 'EMPENHADO' in c), None)
 
-    # Criação das colunas visuais
     m1, m2 = st.columns(2)
 
     if col_e:
@@ -118,7 +124,5 @@ def exibir_recursos():
         v_pago = df_base[col_p].apply(limpar_valor).sum()
         m2.metric("Total Pago 2026", f"R$ {v_pago:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.'))
     
-    st.markdown("---") # Linha divisória
-    
-    # Exibição da tabela final
+    st.markdown("---") 
     st.dataframe(df_base, use_container_width=True)
