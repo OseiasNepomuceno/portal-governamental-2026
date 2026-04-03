@@ -117,9 +117,6 @@ def autenticar_usuario(usuario_digitado, senha_digitada):
                 info_usuario = dados.to_dict()
                 info_usuario['PLANO'] = str(dados.get('PLANO', 'BÁSICO')).upper().strip()
                 
-                # CORREÇÃO DE ÍNDICES:
-                # Coluna E (Índice 4) = UF LIBERADA
-                # Coluna F (Índice 5) = REVISOES_USADAS
                 info_usuario['LOCALIDADE'] = dados.iloc[4] if len(dados) >= 5 else "BR"
                 info_usuario['REVISOES_USADAS'] = dados.iloc[5] if len(dados) >= 6 else 0
                 
@@ -204,8 +201,6 @@ def tela_cadastro():
             
             if enviado:
                 if nome and email and senha:
-                    # CORREÇÃO DA ORDEM DE ENVIO (Sem 'CONSULTOR'):
-                    # [A:Email, B:Senha, C:Status, D:Plano, E:UF Liberada, F:Revisões Usadas]
                     sucesso = salvar_cadastro_google_sheets([email, senha, 'pendente', plano_f, local, 0])
                     if sucesso:
                         enviar_aviso_email(nome, plano_f, email)
@@ -299,48 +294,69 @@ def executar():
     else:
         with st.sidebar:
             st.title("Core Essence")
-            usuario_atual = st.session_state.get('usuario_nome', 'Consultor').upper()
+            # Normalização do login para verificação
+            usuario_atual = st.session_state.get('usuario_nome', '').lower().strip()
             plano_atual = st.session_state.get('usuario_plano', 'BÁSICO').upper()
             info_user = st.session_state.get('usuario_logado', {})
             
-            # Localidade - Buscando agora do índice correto salvo no login
             local = info_user.get('LOCALIDADE', "BR")
 
-            st.info(f"👤 **LOGIN:** {usuario_atual}")
+            st.info(f"👤 **LOGIN:** {usuario_atual.upper()}")
             st.success(f"🏆 **PLANO:** {plano_atual}")
             st.warning(f"📍 **LOCAL:** {str(local).upper()}")
             
             st.divider()
             
             menu = ["🏠 Home", "📊 Recursos 2026", "🏛️ Radar de Emendas", "📜 Revisor de Estatuto"]
-            if usuario_atual.lower() == "oseiasnepom@gmail.com":
+            
+            # Verificação específica para o login "admin"
+            if usuario_atual == "admin":
                 menu.append("🔧 Gestão Admin")
+                
             menu.append("🚪 Sair")
             escolha = st.radio("Módulos:", menu)
 
         if escolha == "🏠 Home":
             uso_rev = info_user.get('REVISOES_USADAS', 0)
             exibir_dashboard_boas_vindas(usuario_atual, plano_atual, uso_rev)
+            
         elif escolha == "🚪 Sair":
             st.session_state.clear()
             st.rerun()
+            
         elif escolha == "🏛️ Radar de Emendas":
             radar_emendas_2026.exibir_radar()
+            
         elif escolha == "📊 Recursos 2026":
             recursos2026.exibir_recursos()
+            
         elif escolha == "📜 Revisor de Estatuto":
             revisor_estatuto.exibir_revisor()
+            
         elif escolha == "🔧 Gestão Admin":
-            st.title("🔧 Painel de Gestão")
+            st.title("🔧 Painel de Gestão Administrativa")
             try:
                 scope = ["https://www.googleapis.com/auth/spreadsheets", "https://www.googleapis.com/auth/drive"]
-                creds = Credentials.from_service_account_file('ponto-facial-oseiascarveng-cd7b1ab54295.json', scopes=scope)
+                nome_da_chave = 'ponto-facial-oseiascarveng-cd7b1ab54295.json'
+                creds = Credentials.from_service_account_file(nome_da_chave, scopes=scope)
                 client = gspread.authorize(creds)
-                df_logs = pd.DataFrame(client.open("ID_LICENÇAS").worksheet("logs").get_all_records())
-                st.write("### Histórico de Acessos Recentes")
+                
+                # Histórico de Logs
+                st.write("### 📝 Histórico de Acessos (Logs)")
+                sheet_logs = client.open("ID_LICENÇAS").worksheet("logs")
+                df_logs = pd.DataFrame(sheet_logs.get_all_records())
                 st.dataframe(df_logs, use_container_width=True)
-            except:
-                st.warning("Verifique a aba 'logs' na sua planilha.")
+
+                st.divider()
+
+                # Tabela de Usuários
+                st.write("### 👥 Gestão de Usuários")
+                sheet_user = client.open("ID_LICENÇAS").worksheet("usuario")
+                df_users = pd.DataFrame(sheet_user.get_all_records())
+                st.dataframe(df_users, use_container_width=True)
+                
+            except Exception as e:
+                st.error(f"Erro ao acessar dados administrativos: {e}")
 
 if __name__ == "__main__":
     executar()
