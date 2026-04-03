@@ -3,7 +3,7 @@ import pandas as pd
 import gdown
 import os
 
-# Dicionário para exibição no menu lateral
+# Dicionário de tradução para o menu lateral
 DE_PARA_UF = {
     'AC': 'ACRE', 'AL': 'ALAGOAS', 'AP': 'AMAPA', 'AM': 'AMAZONAS', 'BA': 'BAHIA',
     'CE': 'CEARA', 'DF': 'DISTRITO FEDERAL', 'ES': 'ESPIRITO SANTO', 'GO': 'GOIAS',
@@ -18,6 +18,7 @@ def limpar_valor(v):
     if pd.isna(v) or str(v).strip() in ["", "0"]: 
         return 0.0
     try:
+        # Padronização: R$ 1.234,56 -> 1234.56
         v = str(v).upper().replace('R$', '').replace(' ', '').replace('.', '').replace(',', '.').strip()
         return float(v)
     except: 
@@ -59,7 +60,7 @@ def exibir_recursos():
             st.write(f"📍 **UF LIBERADA:** {uf_nome_menu}")
         st.divider()
 
-    # Colunas exatas conforme o diagnóstico anterior
+    # --- COLUNAS SELECIONADAS (Incluindo Valor Liquidado) ---
     colunas_finais = [
         "Ano da Emenda", 
         "Tipo de Emenda", 
@@ -67,57 +68,25 @@ def exibir_recursos():
         "Localidade de aplicação do recurso", 
         "UF", 
         "Valor Empenhado", 
+        "Valor Liquidado", 
         "Valor Pago"
     ]
     
     lista_final = []
     
     try:
-        reader = pd.read_csv(nome_arquivo, sep=None, engine='python', encoding='latin1', on_bad_lines='skip', chunksize=150000)
+        reader = pd.read_csv(nome_arquivo, sep=None, engine='python', encoding='latin1', on_bad_lines='skip', chunksize=200000)
         
         for chunk in reader:
-            # 1. Filtro de Ano (2026)
+            # 1. Filtro de Ano 2026
             if "Ano da Emenda" in chunk.columns:
                 chunk = chunk[chunk["Ano da Emenda"].astype(str).str.contains('2026', na=False)]
             
             if chunk.empty: continue
 
-            # 2. FILTRO DE BUSCA POR SIGLA DENTRO DA LOCALIDADE (Ex: buscar "RJ")
+            # 2. Filtro de Localidade / UF
             if not acesso_nacional:
                 col_loc = "Localidade de aplicação do recurso"
-                if col_loc in chunk.columns:
-                    # Busca a sigla do estado (ex: "RJ") dentro da frase da localidade
-                    # Isso garante que pegue "NITERÓI - RJ", "RIO DE JANEIRO - RJ", etc.
-                    termo_busca = f"- {uf_sigla}" # Busca o padrão " - RJ"
-                    chunk = chunk[chunk[col_loc].astype(str).str.upper().str.contains(uf_sigla, na=False)]
-
-            if chunk.empty: continue
-
-            # 3. Seleção das colunas
-            cols_existentes = [c for c in colunas_finais if c in chunk.columns]
-            lista_final.append(chunk[cols_existentes].copy())
-
-        df_base = pd.concat(lista_final, ignore_index=True) if lista_final else pd.DataFrame()
-
-    except Exception as e:
-        st.error(f"Erro no processamento: {e}")
-        return
-
-    if df_base.empty:
-        st.warning(f"Nenhum dado encontrado contendo '{uf_sigla}' na localidade em 2026.")
-        return
-
-    # --- MÉTRICAS ---
-    m1, m2 = st.columns(2)
-    label_local = "BRASIL" if acesso_nacional else uf_nome_menu
-    
-    if "Valor Empenhado" in df_base.columns:
-        v_e = df_base["Valor Empenhado"].apply(limpar_valor).sum()
-        m1.metric(f"Total Empenhado ({label_local})", f"R$ {v_e:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.'))
-    
-    if "Valor Pago" in df_base.columns:
-        v_p = df_base["Valor Pago"].apply(limpar_valor).sum()
-        m2.metric(f"Total Pago ({label_local})", f"R$ {v_p:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.'))
-    
-    st.markdown("---") 
-    st.dataframe(df_base, use_container_width=True)
+                col_uf = "UF"
+                condicao_loc = chunk[col_loc].astype(str).str.upper().str.contains(uf_sigla, na=False)
+                condicao_uf = chunk[col_
