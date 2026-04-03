@@ -9,7 +9,7 @@ def limpar_valor_monetario(v):
     if pd.isna(v) or str(v).strip() == "" or str(v).strip() == "0":
         return 0.0
     try:
-        # Padronização para conversão float (Remove R$, espaços e ajusta separadores)
+        # Padronização para conversão float
         v = str(v).upper().replace('R$', '').replace(' ', '').replace('.', '').replace(',', '.').strip()
         return float(v)
     except:
@@ -36,7 +36,7 @@ def carregar_dados_drive():
         # Padroniza nomes das colunas
         df.columns = [str(c).strip().upper() for c in df.columns]
         
-        # Criação do Ano de Filtro baseado em colunas de data
+        # Criação do Ano de Filtro
         col_data = next((c for c in df.columns if 'DATA' in c or 'DT' in c), None)
         if col_data:
             df['ANO_FILTRO'] = pd.to_datetime(df[col_data], dayfirst=True, errors='coerce').dt.year
@@ -60,7 +60,8 @@ def exibir_recursos():
 
     # --- MAPEAMENTO DINÂMICO ---
     col_uf = next((c for c in df_base.columns if c == 'UF' or 'ESTADO' in c), "UF")
-    col_mun = next((c for c in df_base.columns if 'MUNICI' in c), "NOME MUNICÍPIO")
+    # Tenta encontrar a coluna de município de forma mais abrangente
+    col_mun = next((c for c in df_base.columns if 'MUNICI' in c or 'CIDADE' in c), "NOME MUNICÍPIO")
     col_valor = next((c for c in df_base.columns if 'VALOR' in c), None)
     col_ano = 'ANO_FILTRO'
 
@@ -72,21 +73,25 @@ def exibir_recursos():
         local_liberado = str(usuario.get('local_liberado', '')).upper()
         
         if "BRONZE" in plano_user:
-            cidades_permitidas = [c.strip().upper() for c in local_liberado.split(',')]
+            # AJUSTE CRÍTICO: Limpa espaços de cada cidade individualmente
+            cidades_permitidas = [c.strip() for c in local_liberado.split(',') if c.strip()]
+            
             if col_mun in df_base.columns:
-                df_base[col_mun] = df_base[col_mun].fillna('').astype(str).str.upper()
+                # Garante que a coluna do CSV também esteja limpa de espaços e em maiúsculas
+                df_base[col_mun] = df_base[col_mun].fillna('').astype(str).str.strip().upper()
                 df_base = df_base[df_base[col_mun].isin(cidades_permitidas)]
+            
             st.sidebar.warning(f"📍 Acesso Bronze: {len(cidades_permitidas)} cidades.")
             
         elif "PRATA" in plano_user:
             if col_uf in df_base.columns:
-                df_base = df_base[df_base[col_uf].str.upper() == local_liberado]
+                df_base = df_base[df_base[col_uf].str.upper().str.strip() == local_liberado.strip()]
             st.sidebar.info(f"📍 Acesso Prata: Estado {local_liberado}.")
             
         elif "OURO" in plano_user:
-            estados_permitidos = [e.strip().upper() for e in local_liberado.split(',')]
+            estados_permitidos = [e.strip() for e in local_liberado.split(',') if e.strip()]
             if col_uf in df_base.columns:
-                df_base = df_base[df_base[col_uf].str.upper().isin(estados_permitidos)]
+                df_base = df_base[df_base[col_uf].str.upper().str.strip().isin(estados_permitidos)]
             st.sidebar.info(f"📍 Acesso Ouro: {len(estados_permitidos)} estados.")
 
     # Conversão de valores financeiros
@@ -127,4 +132,4 @@ def exibir_recursos():
         st.dataframe(df_f, use_container_width=True)
     else:
         st.metric("Total Encontrado", "R$ 0,00")
-        st.warning("⚠️ Nenhum registro encontrado para os critérios selecionados.")
+        st.warning(f"⚠️ Nenhum registro encontrado para as cidades: {', '.join(cidades_permitidas) if 'cidades_permitidas' in locals() else ''}")
