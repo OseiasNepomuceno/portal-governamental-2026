@@ -70,3 +70,41 @@ def exibir_recursos():
             # SELEÇÃO DE COLUNAS (Bloqueia códigos IBGE/IDs)
             cols_ok = []
             for a in alvos:
+                encontrada = next((c for c in chunk.columns if a in c and 'COD' not in c and 'IBGE' not in c and 'ID' not in c), None)
+                if encontrada:
+                    cols_ok.append(encontrada)
+            
+            cols_ok = list(dict.fromkeys(cols_ok))
+            
+            if cols_ok:
+                lista_final.append(chunk[cols_ok].copy())
+
+        df_base = pd.concat(lista_final, ignore_index=True) if lista_final else pd.DataFrame()
+
+    except Exception as e:
+        st.error(f"Erro no processamento: {e}")
+        return
+
+    if df_base.empty:
+        st.warning(f"Sem dados de 2026 para: {locais_limpos}")
+        return
+
+    # --- EXIBIÇÃO DO DASHBOARD (MÉTRICAS LADO A LADO) ---
+    col_p = next((c for c in df_base.columns if 'PAGO' in c), None)
+    col_e = next((c for c in df_base.columns if 'EMPENHADO' in c), None)
+
+    # Criação das colunas visuais
+    m1, m2 = st.columns(2)
+
+    if col_e:
+        v_empenhado = df_base[col_e].apply(limpar_valor).sum()
+        m1.metric("Total Empenhado 2026", f"R$ {v_empenhado:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.'))
+
+    if col_p:
+        v_pago = df_base[col_p].apply(limpar_valor).sum()
+        m2.metric("Total Pago 2026", f"R$ {v_pago:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.'))
+    
+    st.markdown("---") # Linha divisória
+    
+    # Exibição da tabela final
+    st.dataframe(df_base, use_container_width=True)
