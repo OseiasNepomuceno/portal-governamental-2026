@@ -3,7 +3,7 @@ import pandas as pd
 import gdown
 import os
 
-# Dicionário de tradução para o menu lateral
+# Dicionário de tradução para exibição e filtros
 DE_PARA_UF = {
     'AC': 'ACRE', 'AL': 'ALAGOAS', 'AP': 'AMAPA', 'AM': 'AMAZONAS', 'BA': 'BAHIA',
     'CE': 'CEARA', 'DF': 'DISTRITO FEDERAL', 'ES': 'ESPIRITO SANTO', 'GO': 'GOIAS',
@@ -18,6 +18,7 @@ def limpar_valor(v):
     if pd.isna(v) or str(v).strip() in ["", "0"]: 
         return 0.0
     try:
+        # Padronização financeira para cálculo
         v = str(v).upper().replace('R$', '').replace(' ', '').replace('.', '').replace(',', '.').strip()
         return float(v)
     except: 
@@ -30,7 +31,7 @@ def exibir_recursos():
     nome_arquivo = "20260320_Convenios.csv"
 
     if not os.path.exists(nome_arquivo):
-        with st.spinner("Sincronizando Base de Dados..."):
+        with st.spinner("Sincronizando Base de Dados Nacional..."):
             url = f'https://drive.google.com/uc?id={file_id}'
             gdown.download(url, nome_arquivo, quiet=False, fuzzy=True)
 
@@ -39,35 +40,38 @@ def exibir_recursos():
         st.error("Usuário não logado.")
         return
 
-    # --- DADOS DO USUÁRIO ---
+    # --- LÓGICA DE PERMISSÃO ---
     nome_usuario = str(usuario.get('NOME') or usuario.get('USUARIO') or "Consultor").upper()
     plano = str(usuario.get('PLANO', 'BÁSICO')).upper()
-    uf_sigla = str(usuario.get('UF_LIBERADA') or usuario.get('UF') or "RJ").strip().upper()
+    uf_sigla = str(usuario.get('UF_LIBERADA') or usuario.get('UF') or "").strip().upper()
     
-    uf_nome_menu = DE_PARA_UF.get(uf_sigla, uf_sigla)
+    uf_nome_completo = DE_PARA_UF.get(uf_sigla, uf_sigla)
+    # Define se o usuário tem visão total ou restrita
     acesso_nacional = (plano == "PREMIUM" or uf_sigla == "BRASIL")
 
-    # --- MENU LATERAL ---
+    # --- INTERFACE LATERAL ---
     with st.sidebar:
         st.divider()
         st.markdown("### 👤 Área do Consultor")
         st.info(f"**LOGIN:** {nome_usuario}")
         if acesso_nacional:
             st.success("✅ **PLANO:** PREMIUM (NACIONAL)")
+            label_scope = "BRASIL"
         else:
             st.warning(f"💼 **PLANO:** BÁSICO (ESTADUAL)")
-            st.write(f"📍 **UF LIBERADA:** {uf_nome_menu}")
+            st.write(f"📍 **UF LIBERADA:** {uf_nome_completo}")
+            label_scope = uf_nome_completo
         st.divider()
 
-    # --- DEFINIÇÃO DE COLUNAS (Nomes Exatos do seu Diagnóstico) ---
-    colunas_desejadas = [
+    # Colunas exatas do diagnóstico (Ordem de importância)
+    colunas_finais = [
         "Ano da Emenda", 
         "Tipo de Emenda", 
         "Nome do Autor da Emenda", 
         "Localidade de aplicação do recurso", 
         "UF", 
         "Valor Empenhado", 
-        "Valor Liquidado",  # <--- Coluna inserida conforme diagnóstico
+        "Valor Liquidado", 
         "Valor Pago"
     ]
     
@@ -77,41 +81,40 @@ def exibir_recursos():
         reader = pd.read_csv(nome_arquivo, sep=None, engine='python', encoding='latin1', on_bad_lines='skip', chunksize=200000)
         
         for chunk in reader:
-            # 1. Filtro Ano 2026
+            # 1. Filtro de Ano (Sempre 2026)
             if "Ano da Emenda" in chunk.columns:
                 chunk = chunk[chunk["Ano da Emenda"].astype(str).str.contains('2026', na=False)]
             
             if chunk.empty: continue
 
-            # 2. Filtro Localidade/UF
+            # 2. Filtro de Abrangência (Se não for Premium, filtra por Estado)
             if not acesso_nacional:
                 col_loc = "Localidade de aplicação do recurso"
                 col_uf = "UF"
+                # Busca a sigla ou o nome do estado em qualquer uma das colunas de localização
                 condicao_loc = chunk[col_loc].astype(str).str.upper().str.contains(uf_sigla, na=False)
-                condicao_uf = chunk[col_uf].astype(str).str.upper() == uf_nome_menu
+                condicao_uf = chunk[col_uf].astype(str).str.upper() == uf_nome_completo
                 chunk = chunk[condicao_loc | condicao_uf]
 
             if chunk.empty: continue
 
-            # 3. Seleção de Colunas (Garante que o Valor Liquidado entre)
-            cols_atuais = [c for c in colunas_desejadas if c in chunk.columns]
+            # 3. Seleção de Colunas Estratégicas
+            cols_atuais = [c for c in colunas_finais if c in chunk.columns]
             lista_final.append(chunk[cols_atuais].copy())
 
         df_base = pd.concat(lista_final, ignore_index=True) if lista_final else pd.DataFrame()
 
     except Exception as e:
-        st.error(f"Erro no processamento: {e}")
+        st.error(f"Erro técnico no processamento: {e}")
         return
 
     if df_base.empty:
-        st.warning(f"Nenhum dado encontrado para {uf_sigla} em 2026.")
+        st.warning(f"Nenhum dado de 2026 encontrado para {label_scope}.")
         return
 
-    # --- MÉTRICAS ---
+    # --- MÉTRICAS DE RESUMO ---
     m1, m2, m3 = st.columns(3)
-    label_local = "BRASIL" if acesso_nacional else uf_nome_menu
     
-    # Cálculos financeiros baseados nos nomes exatos
     v_e = df_base["Valor Empenhado"].apply(limpar_valor).sum() if "Valor Empenhado" in df_base.columns else 0
     v_l = df_base["Valor Liquidado"].apply(limpar_valor).sum() if "Valor Liquidado" in df_base.columns else 0
     v_p = df_base["Valor Pago"].apply(limpar_valor).sum() if "Valor Pago" in df_base.columns else 0
@@ -121,7 +124,7 @@ def exibir_recursos():
     m3.metric("Total Pago", f"R$ {v_p:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.'))
     
     st.markdown("---") 
-    st.write(f"Exibindo **{len(df_base)}** registros encontrados ({label_local}).")
+    st.write(f"Exibindo **{len(df_base)}** registros encontrados (**{label_scope}**).")
     
-    # Exibe a planilha final
+    # Exibição da Planilha
     st.dataframe(df_base, use_container_width=True)
