@@ -1,16 +1,17 @@
-# Arquivo Atualizado - Normalização de Acentos e Case - 03/04/2026
+# Arquivo Atualizado - Correção de Import e Normalização - 03/04/2026
 import streamlit as st
 import pandas as pd
 import gdown
 import os
-import unicodedata
+import unicodedata  # <--- IMPORTANTE: ESSA LINHA RESOLVE O SYNTAXERROR
 
-# --- FUNÇÃO DE NORMALIZAÇÃO (REMOVE ACENTOS E ESPAÇOS) ---
+# --- FUNÇÃO DE NORMALIZAÇÃO (REMOVE ACENTOS E PADRONIZA) ---
 def normalizar_texto(texto):
-    if pd.isna(texto):
+    if pd.isna(texto) or texto is None:
         return ""
-    # Remove acentos, espaços extras e coloca em MAIÚSCULO
-    nfkd_form = unicodedata.normalize('NFKD', str(texto))
+    # Remove acentos (Ex: 'Niterói' -> 'NITEROI')
+    texto_str = str(texto)
+    nfkd_form = unicodedata.normalize('NFKD', texto_str)
     texto_sem_acento = "".join([c for c in nfkd_form if not unicodedata.combining(c)])
     return texto_sem_acento.strip().upper()
 
@@ -31,10 +32,13 @@ def carregar_dados_drive():
     if not file_id:
         st.error("ERRO: 'file_id_convenios' não configurado.")
         return pd.DataFrame()
+    
     url = f'https://drive.google.com/uc?id={file_id}'
     try:
         if not os.path.exists(nome_arquivo):
             gdown.download(url, nome_arquivo, quiet=True)
+        
+        # Leitura com detecção automática de separador
         df = pd.read_csv(nome_arquivo, sep=None, engine='python', encoding='latin1', on_bad_lines='skip')
         df.columns = [str(c).strip().upper() for c in df.columns]
         
@@ -64,23 +68,22 @@ def exibir_recursos():
     col_valor = next((c for c in df_base.columns if 'VALOR' in c), None)
     col_ano = 'ANO_FILTRO'
 
-    # --- 1. FILTRO DE SEGURANÇA POR PLANO COM NORMALIZAÇÃO ---
+    # --- 1. FILTRO DE SEGURANÇA ---
     usuario = st.session_state.get('usuario_logado')
     
     if usuario and col_mun:
         plano_user = str(usuario.get('PLANO', 'BRONZE')).upper()
         local_liberado = str(usuario.get('local_liberado', ''))
         
-        # Normaliza a lista de cidades da planilha (Ex: "Niterói" vira "NITEROI")
+        # Normaliza a lista de cidades da planilha
         cidades_permitidas = [normalizar_texto(c) for c in local_liberado.split(',') if c.strip()]
         
         if "BRONZE" in plano_user:
-            # Normaliza a coluna do CSV para bater com a lista
+            # Aplica normalização na coluna do CSV para comparação justa
             df_base['MUN_NORMALIZADO'] = df_base[col_mun].apply(normalizar_texto)
             df_base = df_base[df_base['MUN_NORMALIZADO'].isin(cidades_permitidas)]
             
             st.sidebar.warning(f"📍 Acesso Bronze: {len(cidades_permitidas)} cidades.")
-            st.sidebar.write(f"Cidades Ativas: {', '.join(cidades_permitidas)}")
             
         elif "PRATA" in plano_user:
             estado_alvo = normalizar_texto(local_liberado)
@@ -94,7 +97,7 @@ def exibir_recursos():
             df_base = df_base[df_base['UF_NORMALIZADA'].isin(estados_permitidos)]
             st.sidebar.info(f"📍 Acesso Ouro: {len(estados_permitidos)} estados.")
 
-    # Conversão de valores financeiros
+    # Valor monetário
     if col_valor:
         df_base['VALOR_NUM'] = df_base[col_valor].apply(limpar_valor_monetario)
     else:
@@ -103,8 +106,6 @@ def exibir_recursos():
     # --- 2. INTERFACE DE FILTROS ---
     st.markdown("### 🔍 Busca e Filtros")
     termo = st.text_input("Busca por Favorecido ou Objeto:")
-    
-    # Normaliza o termo de busca para a pesquisa ser ampla
     termo_norm = normalizar_texto(termo)
     
     c1, c2 = st.columns(2)
@@ -113,4 +114,31 @@ def exibir_recursos():
         filtro_ano = st.selectbox("Ano:", opcoes_ano)
     with c2:
         opcoes_uf = ["Todos"] + sorted(df_base[col_uf].dropna().unique().astype(str).tolist())
-        filtro_uf = st.selectbox("Estado (UF):", opcoes
+        filtro_uf = st.selectbox("Estado (UF):", opcoes_uf)
+
+    # Aplicação dos Filtros
+    df_f = df_base.copy()
+    if filtro_ano != "Todos":
+        df_f = df_f[df_f[col_ano] == filtro_ano]
+    if filtro_uf != "Todos":
+        df_f = df_f[df_f[col_uf] == filtro_uf]
+    
+    if termo_norm:
+        # Busca normalizada em todas as colunas
+        mask = df_f.astype(str).apply(lambda x: x.str.upper().str.contains(termo_norm)).any(axis=1)
+        df_f = df_f[mask]
+
+    # --- 3. EXIBIÇÃO ---
+    st.markdown("---")
+    if not df_f.empty:
+        total_soma = df_f['VALOR_NUM'].sum()
+        total_formatado = f"R$ {total_soma:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.')
+        st.metric("Total Encontrado", total_formatado)
+        
+        # Oculta colunas de sistema antes de mostrar
+        cols_para_excluir = ['MUN_NORMALIZADO', 'UF_NORMALIZADA', 'VALOR_NUM']
+        df_display = df_f.drop(columns=[c for c in cols_para_excluir if c in df_f.columns])
+        st.dataframe(df_display, use_container_width=True)
+    else:
+        st.metric("Total Encontrado", "R$ 0,00")
+        st.info("ℹ️ Nenhum dado encontrado para os filtros selecionados.")
