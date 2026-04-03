@@ -218,10 +218,8 @@ def executar():
             
             st.info(f"🏆 Plano: {plano}")
             
-            # Lista básica de módulos
             menu = ["📊 Recursos", "🏛️ Radar de Emendas", "📜 Revisão"]
             
-            # SE FOR O OSEIAS, ADICIONA GESTÃO
             if usuario_atual == "oseiasnepom@gmail.com":
                 menu.append("🔧 Gestão Admin")
             
@@ -234,8 +232,48 @@ def executar():
         
         elif escolha == "🔧 Gestão Admin":
             st.subheader("🔧 Painel de Controle - Administrador")
-            st.write("Bem-vindo, Oseias. Use este espaço para gerenciar o portal.")
-            st.warning("Módulo de ativação via App em desenvolvimento. Use a planilha Google para ativar usuários.")
+            st.write("Gerencie as solicitações de acesso dos novos consultores.")
+
+            try:
+                # 1. CONEXÃO COM A PLANILHA
+                scope = ["https://www.googleapis.com/auth/spreadsheets", "https://www.googleapis.com/auth/drive"]
+                nome_da_chave = 'ponto-facial-oseiascarveng-cd7b1ab54295.json'
+                creds = Credentials.from_service_account_file(nome_da_chave, scopes=scope)
+                client = gspread.authorize(creds)
+                sheet = client.open("ID_LICENÇAS").worksheet("usuario")
+                
+                # 2. LEITURA DOS DADOS
+                dados = sheet.get_all_records()
+                df_gestao = pd.DataFrame(dados)
+
+                if not df_gestao.empty:
+                    # Filtra apenas os pendentes (comparação case-insensitive)
+                    pendentes = df_gestao[df_gestao['status'].astype(str).str.lower() == 'pendente']
+                    
+                    if not pendentes.empty:
+                        st.info(f"Existem {len(pendentes)} solicitações aguardando aprovação.")
+                        
+                        for index, row in pendentes.iterrows():
+                            with st.expander(f"Solicitação: {row['usuario']} - Plano: {row['PLANO']}"):
+                                st.write(f"**Localidade:** {row.get('LOCALIDADE', 'N/A')}")
+                                st.write(f"**Tipo:** {row.get('TIPO', 'N/A')}")
+                                
+                                # Botão para mudar status para 'ativo'
+                                if st.button(f"✅ ATIVAR AGORA: {row['usuario']}", key=f"btn_{index}"):
+                                    # Linha na planilha: index + 2 (1 pelo cabeçalho + 1 porque index inicia em 0)
+                                    linha_planilha = index + 2 
+                                    sheet.update_cell(linha_planilha, 3, "ativo") # Coluna 3 é o Status
+                                    st.success(f"Acesso liberado para {row['usuario']}!")
+                                    st.rerun()
+                    else:
+                        st.success("🎉 Nenhuma solicitação pendente no momento!")
+                
+                st.markdown("---")
+                st.write("### Lista Geral de Usuários")
+                st.dataframe(df_gestao)
+
+            except Exception as e:
+                st.error(f"Erro ao carregar painel de gestão: {e}")
             
         else:
             st.write(f"### Bem-vindo ao módulo {escolha}")
