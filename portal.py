@@ -8,7 +8,7 @@ import smtplib
 from email.mime.text import MIMEText
 import urllib.parse
 from google.oauth2.service_account import Credentials
-import radar  # Adicione isso logo abaixo dos outros imports
+import radar  # Importação do módulo do Radar
 
 # --- 1. FUNÇÕES DE APOIO (CONEXÃO GOOGLE E NOTIFICAÇÕES) ---
 
@@ -65,6 +65,7 @@ def autenticar_usuario(usuario_digitado, senha_digitada):
             dados = user_row.iloc[0]
             status_bruto = dados.get('STATUS', dados.get('status', 'ativo'))
             if str(status_bruto).lower().strip() == 'ativo':
+                # Armazenamos os dados completos para o Radar usar os filtros de localidade
                 st.session_state['usuario_logado'] = dados.to_dict() 
                 st.session_state['logado'] = True
                 st.session_state['usuario_nome'] = dados.get('usuario', 'Consultor')
@@ -214,71 +215,4 @@ def executar():
         # --- ÁREA LOGADA COM RECONHECIMENTO DE ADMIN ---
         with st.sidebar:
             st.title("Core Essence")
-            plano = st.session_state.get('usuario_plano', 'BRONZE')
-            usuario_atual = st.session_state.get('usuario_nome')
-            
-            st.info(f"🏆 Plano: {plano}")
-            
-            menu = ["📊 Recursos", "🏛️ Radar de Emendas", "📜 Revisão"]
-            
-            if usuario_atual == "oseiasnepom@gmail.com":
-                menu.append("🔧 Gestão Admin")
-            
-            menu.append("🚪 Sair")
-            escolha = st.radio("Módulos:", menu)
-
-        if escolha == "🚪 Sair":
-            st.session_state.clear()
-            st.rerun()
-        
-        elif escolha == "🔧 Gestão Admin":
-            st.subheader("🔧 Painel de Controle - Administrador")
-            st.write("Gerencie as solicitações de acesso dos novos consultores.")
-
-            try:
-                # 1. CONEXÃO COM A PLANILHA
-                scope = ["https://www.googleapis.com/auth/spreadsheets", "https://www.googleapis.com/auth/drive"]
-                nome_da_chave = 'ponto-facial-oseiascarveng-cd7b1ab54295.json'
-                creds = Credentials.from_service_account_file(nome_da_chave, scopes=scope)
-                client = gspread.authorize(creds)
-                sheet = client.open("ID_LICENÇAS").worksheet("usuario")
-                
-                # 2. LEITURA DOS DADOS
-                dados = sheet.get_all_records()
-                df_gestao = pd.DataFrame(dados)
-
-                if not df_gestao.empty:
-                    # Filtra apenas os pendentes (comparação case-insensitive)
-                    pendentes = df_gestao[df_gestao['status'].astype(str).str.lower() == 'pendente']
-                    
-                    if not pendentes.empty:
-                        st.info(f"Existem {len(pendentes)} solicitações aguardando aprovação.")
-                        
-                        for index, row in pendentes.iterrows():
-                            with st.expander(f"Solicitação: {row['usuario']} - Plano: {row['PLANO']}"):
-                                st.write(f"**Localidade:** {row.get('LOCALIDADE', 'N/A')}")
-                                st.write(f"**Tipo:** {row.get('TIPO', 'N/A')}")
-                                
-                                # Botão para mudar status para 'ativo'
-                                if st.button(f"✅ ATIVAR AGORA: {row['usuario']}", key=f"btn_{index}"):
-                                    # Linha na planilha: index + 2 (1 pelo cabeçalho + 1 porque index inicia em 0)
-                                    linha_planilha = index + 2 
-                                    sheet.update_cell(linha_planilha, 3, "ativo") # Coluna 3 é o Status
-                                    st.success(f"Acesso liberado para {row['usuario']}!")
-                                    st.rerun()
-                    else:
-                        st.success("🎉 Nenhuma solicitação pendente no momento!")
-                
-                st.markdown("---")
-                st.write("### Lista Geral de Usuários")
-                st.dataframe(df_gestao)
-
-            except Exception as e:
-                st.error(f"Erro ao carregar painel de gestão: {e}")
-            
-        else:
-            st.write(f"### Bem-vindo ao módulo {escolha}")
-            st.info("Utilize o menu lateral para navegar entre as ferramentas de inteligência.")
-
-if __name__ == "__main__":
-    executar()
+            plano = st.session_state.get('usuario_plano', 'BRONZE
