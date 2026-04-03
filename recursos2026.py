@@ -40,7 +40,7 @@ def exibir_recursos():
         st.error("Usuário não identificado.")
         return
 
-    # Lista de termos que queremos encontrar (Nomes das Colunas)
+    # Colunas que queremos exibir (Apenas os nomes, sem IDs ou códigos)
     termos_desejados = [
         'ANO DA EMENDA', 'TIPO DA EMENDA', 'NOME DO AUTOR DA EMENDA', 
         'MUNICÍPIO', 'UF', 'VALOR EMPENHADO', 'VALOR LIQUIDADO', 'VALOR PAGO'
@@ -75,21 +75,21 @@ def exibir_recursos():
 
             # FILTRO 2: Localidade (Regra Bronze/Prata)
             if not ver_tudo:
-                # Busca a coluna de município ignorando colunas de código
+                # Busca a coluna de município ignorando colunas de código/IBGE
                 col_mun_filtro = next((c for c in chunk.columns if 'MUNICI' in c and 'COD' not in c and 'IBGE' not in c), None)
                 if col_mun_filtro:
                     padrao = '|'.join(locais_limpos)
                     chunk = chunk[chunk[col_mun_filtro].astype(str).str.upper().str.contains(padrao, na=False)]
 
-            # SELEÇÃO FINAL: Pega apenas o que você pediu e bloqueia IDs/CÓDIGOS/IBGE
+            # SELEÇÃO FINAL: Bloqueia explicitamente colunas com 'COD', 'IBGE' ou 'ID'
             cols_finais = []
             for termo in termos_desejados:
-                # Encontra a coluna que contém o termo, mas NÃO contém "COD", "ID" ou "IBGE"
+                # Encontra a coluna que contém o termo desejado, mas que NÃO seja uma coluna de código
                 encontrada = next((c for c in chunk.columns if termo in c and 'COD' not in c and 'IBGE' not in c and 'ID' not in c), None)
                 if encontrada:
                     cols_finais.append(encontrada)
             
-            # Garante que não haverá duplicatas na seleção
+            # Remove duplicatas da lista de colunas
             cols_finais = list(dict.fromkeys(cols_finais))
             
             if cols_finais:
@@ -98,3 +98,11 @@ def exibir_recursos():
                     lista_pedacos.append(chunk_f)
 
         status.empty()
+        df_base = pd.concat(lista_pedacos, ignore_index=True) if lista_pedacos else pd.DataFrame()
+
+    except Exception as e:
+        st.error(f"Erro no processamento: {e}")
+        return
+
+    if df_base.empty:
+        st.warning(f"Nenhum recurso de 2026 localizado para: {locais
