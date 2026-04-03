@@ -1,23 +1,20 @@
-# Arquivo Atualizado - Correção de Import e Normalização - 03/04/2026
+# Arquivo Atualizado - Correção de Memória e Trava de Segurança - 03/04/2026
 import streamlit as st
 import pandas as pd
 import gdown
 import os
-import unicodedata  # <--- IMPORTANTE: ESSA LINHA RESOLVE O SYNTAXERROR
+import unicodedata
 
-# --- FUNÇÃO DE NORMALIZAÇÃO (REMOVE ACENTOS E PADRONIZA) ---
+# --- FUNÇÃO DE NORMALIZAÇÃO ---
 def normalizar_texto(texto):
     if pd.isna(texto) or texto is None:
         return ""
-    # Remove acentos (Ex: 'Niterói' -> 'NITEROI')
-    texto_str = str(texto)
-    nfkd_form = unicodedata.normalize('NFKD', texto_str)
-    texto_sem_acento = "".join([c for c in nfkd_form if not unicodedata.combining(c)])
-    return texto_sem_acento.strip().upper()
+    nfkd_form = unicodedata.normalize('NFKD', str(texto))
+    return "".join([c for c in nfkd_form if not unicodedata.combining(c)]).strip().upper()
 
 # --- FUNÇÃO DE LIMPEZA MONETÁRIA ---
 def limpar_valor_monetario(v):
-    if pd.isna(v) or str(v).strip() == "" or str(v).strip() == "0":
+    if pd.isna(v) or str(v).strip() in ["", "0"]:
         return 0.0
     try:
         v = str(v).upper().replace('R$', '').replace(' ', '').replace('.', '').replace(',', '.').strip()
@@ -38,7 +35,7 @@ def carregar_dados_drive():
         if not os.path.exists(nome_arquivo):
             gdown.download(url, nome_arquivo, quiet=True)
         
-        # Leitura com detecção automática de separador
+        # Lendo apenas as colunas necessárias para economizar memória (OPCIONAL, mas ajuda)
         df = pd.read_csv(nome_arquivo, sep=None, engine='python', encoding='latin1', on_bad_lines='skip')
         df.columns = [str(c).strip().upper() for c in df.columns]
         
@@ -49,96 +46,93 @@ def carregar_dados_drive():
             df['ANO_FILTRO'] = df['ANO_FILTRO'].fillna(0).astype(int).astype(str)
         else:
             df['ANO_FILTRO'] = "2026"
+            
         return df
     except Exception as e:
-        st.error(f"Erro ao processar base: {e}")
+        st.error(f"Erro ao carregar base: {e}")
         return pd.DataFrame()
 
 def exibir_recursos():
     st.title("📊 Radar de Recursos (Core Essence)")
-    df_base = carregar_dados_drive()
-
-    if df_base.empty:
-        st.warning("A base de dados está vazia ou não foi carregada.")
+    
+    # 1. Carrega a base bruta
+    df_raw = carregar_dados_drive()
+    if df_raw.empty:
+        st.warning("Aguardando carregamento da base...")
         return
 
     # --- MAPEAMENTO DE COLUNAS ---
-    col_uf = next((c for c in df_base.columns if c == 'UF' or 'ESTADO' in c), "UF")
-    col_mun = next((c for c in df_base.columns if 'MUNICI' in c or 'CIDADE' in c), None)
-    col_valor = next((c for c in df_base.columns if 'VALOR' in c), None)
-    col_ano = 'ANO_FILTRO'
+    col_uf = next((c for c in df_raw.columns if c == 'UF' or 'ESTADO' in c), "UF")
+    col_mun = next((c for c in df_raw.columns if 'MUNICI' in c or 'CIDADE' in c), "MUNICIPIO")
+    col_valor = next((c for c in df_raw.columns if 'VALOR' in c), None)
 
-    # --- 1. FILTRO DE SEGURANÇA ---
+    # --- 2. APLICAÇÃO IMEDIATA DA TRAVA DE SEGURANÇA (ECONOMIA DE MEMÓRIA) ---
     usuario = st.session_state.get('usuario_logado')
-    
-    if usuario and col_mun:
-        plano_user = str(usuario.get('PLANO', 'BRONZE')).upper()
-        local_liberado = str(usuario.get('local_liberado', ''))
-        
-        # Normaliza a lista de cidades da planilha
-        cidades_permitidas = [normalizar_texto(c) for c in local_liberado.split(',') if c.strip()]
-        
-        if "BRONZE" in plano_user:
-            # Aplica normalização na coluna do CSV para comparação justa
-            df_base['MUN_NORMALIZADO'] = df_base[col_mun].apply(normalizar_texto)
-            df_base = df_base[df_base['MUN_NORMALIZADO'].isin(cidades_permitidas)]
-            
-            st.sidebar.warning(f"📍 Acesso Bronze: {len(cidades_permitidas)} cidades.")
-            
-        elif "PRATA" in plano_user:
-            estado_alvo = normalizar_texto(local_liberado)
-            df_base['UF_NORMALIZADA'] = df_base[col_uf].apply(normalizar_texto)
-            df_base = df_base[df_base['UF_NORMALIZADA'] == estado_alvo]
-            st.sidebar.info(f"📍 Acesso Prata: Estado {estado_alvo}.")
-            
-        elif "OURO" in plano_user:
-            estados_permitidos = [normalizar_texto(e) for e in local_liberado.split(',') if e.strip()]
-            df_base['UF_NORMALIZADA'] = df_base[col_uf].apply(normalizar_texto)
-            df_base = df_base[df_base['UF_NORMALIZADA'].isin(estados_permitidos)]
-            st.sidebar.info(f"📍 Acesso Ouro: {len(estados_permitidos)} estados.")
+    df_base = pd.DataFrame() # Começa vazio por segurança
 
-    # Valor monetário
+    if usuario:
+        plano = str(usuario.get('PLANO', 'BRONZE')).upper()
+        local = str(usuario.get('local_liberado', ''))
+        
+        if "BRONZE" in plano:
+            cidades_permitidas = [normalizar_texto(c) for c in local.split(',') if c.strip()]
+            # Criamos uma coluna temporária para filtrar e já descartamos a bruta para economizar RAM
+            df_raw['MUN_NORM'] = df_raw[col_mun].apply(normalizar_texto)
+            df_base = df_raw[df_raw['MUN_NORM'].isin(cidades_permitidas)].copy()
+            st.sidebar.warning(f"📍 Plano Bronze: {len(cidades_permitidas)} cidades.")
+            
+        elif "PRATA" in plano:
+            estado_alvo = normalizar_texto(local)
+            df_raw['UF_NORM'] = df_raw[col_uf].apply(normalizar_texto)
+            df_base = df_raw[df_raw['UF_NORM'] == estado_alvo].copy()
+            st.sidebar.info(f"📍 Plano Prata: Estado {estado_alvo}.")
+        
+        else: # Ouro ou Admin
+            df_base = df_raw.copy()
+
+    # Se após a trava o DF estiver vazio, paramos aqui
+    if df_base.empty:
+        st.info("ℹ️ Nenhum dado disponível para sua licença nesta base.")
+        return
+
+    # Limpeza financeira (só no que sobrou da trava)
     if col_valor:
         df_base['VALOR_NUM'] = df_base[col_valor].apply(limpar_valor_monetario)
-    else:
-        df_base['VALOR_NUM'] = 0.0
 
-    # --- 2. INTERFACE DE FILTROS ---
+    # --- 3. INTERFACE DE FILTROS DINÂMICOS (TRAVADOS PELO PLANO) ---
     st.markdown("### 🔍 Busca e Filtros")
     termo = st.text_input("Busca por Favorecido ou Objeto:")
-    termo_norm = normalizar_texto(termo)
     
     c1, c2 = st.columns(2)
     with c1:
-        opcoes_ano = ["Todos"] + sorted(df_base[col_ano].unique().tolist(), reverse=True)
+        # Só mostra anos que existem nos dados liberados
+        opcoes_ano = ["Todos"] + sorted(df_base['ANO_FILTRO'].unique().tolist(), reverse=True)
         filtro_ano = st.selectbox("Ano:", opcoes_ano)
     with c2:
-        opcoes_uf = ["Todos"] + sorted(df_base[col_uf].dropna().unique().astype(str).tolist())
+        # Só mostra estados que existem nos dados liberados (Para Gláucia aparecerá só RJ)
+        opcoes_uf = ["Todos"] + sorted(df_base[col_uf].dropna().unique().tolist())
         filtro_uf = st.selectbox("Estado (UF):", opcoes_uf)
 
-    # Aplicação dos Filtros
+    # Filtragem Final
     df_f = df_base.copy()
     if filtro_ano != "Todos":
-        df_f = df_f[df_f[col_ano] == filtro_ano]
+        df_f = df_f[df_f['ANO_FILTRO'] == filtro_ano]
     if filtro_uf != "Todos":
         df_f = df_f[df_f[col_uf] == filtro_uf]
-    
-    if termo_norm:
-        # Busca normalizada em todas as colunas
-        mask = df_f.astype(str).apply(lambda x: x.str.upper().str.contains(termo_norm)).any(axis=1)
+    if termo:
+        termo_norm = normalizar_texto(termo)
+        mask = df_f.astype(str).apply(lambda x: x.str.upper().contains(termo_norm)).any(axis=1)
         df_f = df_f[mask]
 
-    # --- 3. EXIBIÇÃO ---
+    # --- 4. EXIBIÇÃO ---
     st.markdown("---")
     if not df_f.empty:
-        total_soma = df_f['VALOR_NUM'].sum()
-        total_formatado = f"R$ {total_soma:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.')
-        st.metric("Total Encontrado", total_formatado)
+        total = df_f['VALOR_NUM'].sum()
+        st.metric("Total Encontrado", f"R$ {total:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.'))
         
-        # Oculta colunas de sistema antes de mostrar
-        cols_para_excluir = ['MUN_NORMALIZADO', 'UF_NORMALIZADA', 'VALOR_NUM']
-        df_display = df_f.drop(columns=[c for c in cols_para_excluir if c in df_f.columns])
-        st.dataframe(df_display, use_container_width=True)
+        # Remove colunas auxiliares antes de mostrar
+        cols_limpas = [c for c in df_f.columns if '_NORM' not in c and 'VALOR_NUM' != c]
+        st.dataframe(df_f[cols_limpas], use_container_width=True)
     else:
         st.metric("Total Encontrado", "R$ 0,00")
-        st.info("ℹ️ Nenhum dado encontrado para os filtros selecionados.")
+        st.info("Nenhum registro encontrado para esses filtros.")
