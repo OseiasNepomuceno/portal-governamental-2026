@@ -5,8 +5,8 @@ import os
 import gspread
 import smtplib
 from email.mime.text import MIMEText
-import urllib.parse
 from google.oauth2.service_account import Credentials
+from datetime import datetime
 
 # --- 1. IMPORTAÇÃO DOS MÓDULOS ---
 import radar_emendas_2026
@@ -14,6 +14,21 @@ import recursos2026
 import revisor_estatuto
 
 # --- 2. FUNÇÕES DE APOIO ---
+
+def registrar_log_acesso(nome, email, plano):
+    """Grava o histórico de acessos na aba 'logs' da planilha Google Sheets"""
+    scope = ["https://www.googleapis.com/auth/spreadsheets", "https://www.googleapis.com/auth/drive"]
+    try:
+        nome_da_chave = 'ponto-facial-oseiascarveng-cd7b1ab54295.json'
+        if os.path.exists(nome_da_chave):
+            creds = Credentials.from_service_account_file(nome_da_chave, scopes=scope)
+            client = gspread.authorize(creds)
+            # Abre a planilha e a aba 'logs' (Certifique-se que essa aba existe no seu Google Sheets)
+            planilha = client.open("ID_LICENÇAS").worksheet("logs")
+            data_hora = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
+            planilha.append_row([data_hora, nome, email, plano])
+    except Exception as e:
+        print(f"Erro ao registrar log: {e}")
 
 def salvar_cadastro_google_sheets(dados_cliente):
     scope = ["https://www.googleapis.com/auth/spreadsheets", "https://www.googleapis.com/auth/drive"]
@@ -64,12 +79,16 @@ def autenticar_usuario(usuario_digitado, senha_digitada):
             if str(dados.get('STATUS', 'pendente')).lower().strip() == 'ativo':
                 info_usuario = dados.to_dict()
                 info_usuario['PLANO'] = str(dados.get('PLANO', 'BRONZE')).upper().strip()
-                info_usuario['local_liberado'] = str(dados.get('LOCALIDADE', '')).upper().strip()
                 
+                # SESSÃO ATUALIZADA
                 st.session_state['usuario_logado'] = info_usuario
                 st.session_state['logado'] = True
                 st.session_state['usuario_nome'] = str(dados.get('USUARIO', ''))
                 st.session_state['usuario_plano'] = info_usuario['PLANO']
+                
+                # --- REGISTRO DE LOG AO AUTENTICAR ---
+                registrar_log_acesso(st.session_state['usuario_nome'], usuario_digitado, info_usuario['PLANO'])
+                
                 return True
         return False
     except Exception as e:
@@ -80,7 +99,6 @@ def autenticar_usuario(usuario_digitado, senha_digitada):
 st.set_page_config(page_title="Core Essence | Inteligência Governamental", page_icon="🛰️", layout="wide")
 
 # --- 4. TELA DE CADASTRO ---
-
 def tela_cadastro():
     st.title("🚀 Cadastro de Novo Consultor")
     links_pagamento = {
@@ -166,13 +184,18 @@ def executar():
         with st.sidebar:
             st.title("Core Essence")
             usuario_atual = st.session_state.get('usuario_nome', 'Consultor')
-            st.info(f"🏆 Plano: {st.session_state.get('usuario_plano', 'BRONZE')}")
+            
+            # --- CORREÇÃO SOLICITADA: LOGIN: USUARIO_LOGADO ---
+            st.info(f"👤 **LOGIN:** {usuario_atual.upper()}")
+            st.success(f"🏆 **PLANO:** {st.session_state.get('usuario_plano', 'BRONZE')}")
             
             menu = ["📊 Recursos 2026", "🏛️ Radar de Emendas", "📜 Revisor de Estatuto"]
+            
+            # Acesso Admin para o seu e-mail
             if usuario_atual.lower() == "oseiasnepom@gmail.com":
                 menu.append("🔧 Gestão Admin")
-            menu.append("🚪 Sair")
             
+            menu.append("🚪 Sair")
             escolha = st.radio("Módulos:", menu)
 
         if escolha == "🚪 Sair":
@@ -185,7 +208,20 @@ def executar():
         elif escolha == "📜 Revisor de Estatuto":
             revisor_estatuto.exibir_revisor()
         elif escolha == "🔧 Gestão Admin":
-            st.write("Módulo Administrativo")
+            st.title("🔧 Painel de Gestão")
+            tab1, tab2 = st.tabs(["LOG_ACESSOS", "Configurações"])
+            
+            with tab1:
+                try:
+                    scope = ["https://www.googleapis.com/auth/spreadsheets", "https://www.googleapis.com/auth/drive"]
+                    creds = Credentials.from_service_account_file('ponto-facial-oseiascarveng-cd7b1ab54295.json', scopes=scope)
+                    client = gspread.authorize(creds)
+                    # Lê os logs direto da planilha
+                    df_logs = pd.DataFrame(client.open("ID_LICENÇAS").worksheet("logs").get_all_records())
+                    st.write("### Histórico de Acessos Recentes")
+                    st.dataframe(df_logs, use_container_width=True)
+                except:
+                    st.warning("Crie uma aba chamada 'logs' na sua planilha 'ID_LICENÇAS' para visualizar os dados.")
 
 if __name__ == "__main__":
     executar()
