@@ -9,7 +9,8 @@ from email.mime.text import MIMEText
 import urllib.parse
 from google.oauth2.service_account import Credentials
 
-# --- 1. FUNÇÕES DE APOIO (CONEXÃO GOOGLE) ---
+# --- 1. FUNÇÕES DE APOIO (CONEXÃO GOOGLE E NOTIFICAÇÕES) ---
+
 def salvar_cadastro_google_sheets(dados_cliente):
     scope = ["https://www.googleapis.com/auth/spreadsheets", "https://www.googleapis.com/auth/drive"]
     try:
@@ -22,6 +23,29 @@ def salvar_cadastro_google_sheets(dados_cliente):
     except Exception as e:
         st.error(f"Erro técnico ao acessar a planilha: {e}")
         return False
+
+def enviar_aviso_email(nome, plano, email_cliente):
+    meu_email = "oseiasnepom@gmail.com" 
+    minha_senha = "tukh raae ebnc dgoe" 
+    
+    msg = MIMEText(f"Olá Oseias!\n\nUm novo consultor acabou de se cadastrar:\n\nNome: {nome}\nPlano: {plano}\nE-mail: {email_cliente}\n\nVerifique a planilha ID_LICENÇAS para liberar o acesso.")
+    msg['Subject'] = f"🚀 NOVO CADASTRO: {plano} - {nome}"
+    msg['From'] = meu_email
+    msg['To'] = meu_email
+
+    try:
+        server = smtplib.SMTP_SSL('smtp.gmail.com', 465)
+        server.login(meu_email, minha_senha)
+        server.sendmail(meu_email, meu_email, msg.as_string())
+        server.quit()
+        return True
+    except:
+        return False
+
+def gerar_link_whatsapp(nome, plano):
+    texto = f"Olá Core Essence! Acabei de me cadastrar no Portal Radar 2026.\nNome: {nome}\nPlano Escolhido: {plano}.\nAguardo liberação!"
+    texto_url = urllib.parse.quote(texto)
+    return f"https://wa.me/5518991466238?text={texto_url}"
 
 def autenticar_usuario(usuario_digitado, senha_digitada):
     file_id = st.secrets.get("file_id_licencas")
@@ -52,6 +76,7 @@ def autenticar_usuario(usuario_digitado, senha_digitada):
 st.set_page_config(page_title="Core Essence", page_icon="🛰️", layout="wide")
 
 # --- 3. TELAS DO SISTEMA ---
+
 def tela_cadastro():
     st.title("🚀 Cadastro de Novo Consultor")
     st.write("Escolha seu plano e preencha os dados para solicitar seu acesso.")
@@ -60,7 +85,7 @@ def tela_cadastro():
         st.session_state['tela'] = 'home'
         st.rerun()
 
-    # --- 1. SELEÇÃO DE PLANO (FORA DO FORMULÁRIO PARA ATUALIZAR NA HORA) ---
+    # 1. SELEÇÃO DE PLANO
     opcoes_planos = {
         "BRONZE: Acesso a até 03 Municípios + 05 Revisões": "BRONZE",
         "PRATA: Acesso a 01 Estado completo + 15 Revisões": "PRATA",
@@ -71,13 +96,13 @@ def tela_cadastro():
     escolha_visual = st.selectbox("Selecione o Plano Desejado:", list(opcoes_planos.keys()))
     plano_final = opcoes_planos[escolha_visual]
 
-    # --- 2. LÓGICA DINÂMICA DE LABELS ---
+    # 2. LÓGICA DINÂMICA
     if plano_final == "BRONZE":
         label_local = "📍 Liste as 03 Cidades de Interesse"
         placeholder_local = "Ex: Presidente Prudente, Álvares Machado..."
         tipo_consultor = "MUNICIPAL"
     elif plano_final in ["PRATA", "OURO"]:
-        label_local = f"📍 Liste os Estados (UF) de Interesse"
+        label_local = "📍 Liste os Estados (UF) de Interesse"
         placeholder_local = "Ex: SP, RJ, MG"
         tipo_consultor = "ESTADUAL"
     else:
@@ -85,7 +110,7 @@ def tela_cadastro():
         placeholder_local = "Digite BRASIL ou deixe em branco"
         tipo_consultor = "NACIONAL"
 
-    # --- 3. FORMULÁRIO DE DADOS PESSOAIS ---
+    # 3. FORMULÁRIO
     with st.form("form_dados_pessoais"):
         nome = st.text_input("Nome Completo")
         email = st.text_input("E-mail (Seu futuro usuário)")
@@ -98,25 +123,21 @@ def tela_cadastro():
         
         if btn_enviar:
             if nome and email and senha:
-                # Ordem das colunas: usuario, senha, status, plano, tipo_consultor, localidade
                 status_inicial = "pendente" 
                 
                 novo_usuario = [
-                    email,           # Coluna A
-                    senha,           # Coluna B
-                    status_inicial,  # Coluna C
-                    plano_final,     # Coluna D
-                    tipo_consultor,  # Coluna E
-                    localidade       # Coluna F
+                    email,           # Coluna A: usuario
+                    senha,           # Coluna B: senha
+                    status_inicial,  # Coluna C: status
+                    plano_final,     # Coluna D: plano
+                    tipo_consultor,  # Coluna E: tipo_consultor
+                    localidade       # Coluna F: localidade
                 ]
                 
                 if salvar_cadastro_google_sheets(novo_usuario):
                     st.success("✅ Solicitação enviada com sucesso!")
-                    
-                    # Notificação por E-mail (Aviso para o Oseias)
                     enviar_aviso_email(nome, plano_final, email)
                     
-                    # Link para o WhatsApp
                     link_zap = gerar_link_whatsapp(nome, plano_final)
                     st.info("Para agilizar sua liberação, clique abaixo:")
                     st.link_button("📱 AVISAR NO WHATSAPP", link_zap)
@@ -124,38 +145,9 @@ def tela_cadastro():
                     st.error("Erro técnico ao salvar na planilha.")
             else:
                 st.error("Por favor, preencha Nome, E-mail e Senha.")
-                
-                if salvar_cadastro_google_sheets(novo_usuario):
-                    st.success("✅ Solicitação enviada com sucesso!")
-                    
-                    # Notificação por E-mail (Aviso para você)
-                    enviar_aviso_email(nome, plano_final, email)
-                    
-                    # Botão para o cliente te avisar no WhatsApp
-                    link_zap = gerar_link_whatsapp(nome, plano_final)
-                    st.info("Para agilizar sua liberação, clique abaixo:")
-                    st.link_button("📱 AVISAR NO WHATSAPP", link_zap)
-                else:
-                    st.error("Erro técnico ao salvar na planilha.")
-            else:
-                st.error("Preencha todos os campos obrigatórios.")
-                
-                if salvar_cadastro_google_sheets(novo_usuario):
-                    st.success("✅ Solicitação enviada com sucesso!")
-                    
-                    # Envia o e-mail de aviso para você
-                    enviar_aviso_email(nome, plano_final, email)
-                    
-                    # Gera e mostra o botão do WhatsApp
-                    link_zap = gerar_link_whatsapp(nome, plano_final)
-                    st.info("Para agilizar sua liberação, clique abaixo:")
-                    st.link_button("📱 AVISAR NO WHATSAPP", link_zap)
-                else:
-                    st.error("Erro técnico ao salvar na planilha.")
-            else:
-                st.error("Preencha todos os campos obrigatórios.")
 
 # --- 4. NAVEGAÇÃO E LÓGICA PRINCIPAL ---
+
 def executar():
     if 'logado' not in st.session_state:
         st.session_state['logado'] = False
@@ -166,108 +158,3 @@ def executar():
         if st.session_state['tela'] == 'home':
             st.markdown("<h1 style='text-align: center;'>🛰️ Core Essence</h1>", unsafe_allow_html=True)
             st.markdown("<h3 style='text-align: center; color: #555;'>Inteligência Governamental Estratégica</h3>", unsafe_allow_html=True)
-            st.write("\n")
-            
-            c_f1, c_f2, c_f3 = st.columns(3)
-            with c_f1:
-                st.info("**Para nossos Consultores:**\n\n*Bem-vindo de volta ao centro da estratégia.*")
-            with c_f2:
-                st.success("**Para novos Membros:**\n\n*Transforme dados governamentais em faturamento real.*")
-            with c_f3:
-                st.warning("**Por que ser Core Essence?**\n\n*Não apenas monitore, antecipe-se.*")
-
-            st.markdown("---")
-            col_b1, col_b2 = st.columns(2)
-            with col_b1:
-                if st.button("👤 JÁ SOU CONSULTOR (LOGIN)", use_container_width=True, type="primary"):
-                    st.session_state['tela'] = 'login'
-                    st.rerun()
-            with col_b2:
-                if st.button("🚀 QUERO ME CADASTRAR AGORA", use_container_width=True):
-                    st.session_state['tela'] = 'cadastro'
-                    st.rerun()
-
-        elif st.session_state['tela'] == 'login':
-            st.title("🔑 Acesso ao Portal")
-            if st.button("⬅️ Voltar", key="btn_voltar_login"):
-                st.session_state['tela'] = 'home'
-                st.rerun()
-            with st.form("login_form"):
-                u = st.text_input("Usuário")
-                p = st.text_input("Senha", type="password")
-                if st.form_submit_button("Entrar"):
-                    if autenticar_usuario(u, p):
-                        st.rerun()
-                    else:
-                        st.error("Usuário ou senha incorretos.")
-
-        elif st.session_state['tela'] == 'cadastro':
-            tela_cadastro()
-
-    else:
-        # --- ÁREA LOGADA ---
-        with st.sidebar:
-            st.title("Core Essence")
-            plano = st.session_state.get('usuario_plano', 'BRONZE')
-            user_raw = st.session_state.get('usuario_nome', 'Consultor')
-            user_comparar = str(user_raw).lower().strip()
-            st.info(f"🏆 Plano: {plano}")
-
-            menu = ["📊 Recursos", "🏛️ Radar de Emendas", "📜 Revisão de Estatuto", "🚪 Sair"]
-            if user_comparar == "admin":
-                menu.insert(3, "⚙️ Gestão Administrativa")
-            
-            escolha = st.radio("Módulos:", menu)
-
-        if escolha == "📊 Recursos":
-            import recursos2026 as rec
-            importlib.reload(rec)
-            rec.exibir_radar()
-
-        elif escolha == "🏛️ Radar de Emendas":
-            import radar_emendas_2026 as radar
-            importlib.reload(radar)
-            radar.exibir_radar()
-
-        elif escolha == "📜 Revisão de Estatuto":
-            st.title("📜 Revisão de Estatuto")
-            limite = {"BRONZE": 5, "PRATA": 15, "OURO": 50, "DIAMANTE": 200}.get(plano, 5)
-            st.info(f"Seu plano **{plano}** permite {limite} revisões mensais.")
-            st.file_uploader("Arraste o arquivo (PDF)", type=["pdf"])
-
-        elif escolha == "⚙️ Gestão Administrativa":
-            import gestao as adm
-            importlib.reload(adm)
-            adm.exibir_gestao()
-
-        elif escolha == "🚪 Sair":
-            st.session_state.clear()
-            st.rerun()
-
-def enviar_aviso_email(nome, plano, email_cliente):
-    # CONFIGURAÇÃO DO SEU GMAIL
-    meu_email = "oseiasnepom@gmail.com" 
-    minha_senha = "tukh raae ebnc dgoe" # Senha de 16 dígitos do Google
-    
-    msg = MIMEText(f"Olá Oseias!\n\nUm novo consultor acabou de se cadastrar:\n\nNome: {nome}\nPlano: {plano}\nE-mail: {email_cliente}\n\nVerifique a planilha ID_LICENÇAS para liberar o acesso.")
-    msg['Subject'] = f"🚀 NOVO CADASTRO: {plano} - {nome}"
-    msg['From'] = meu_email
-    msg['To'] = meu_email # Envia para você mesmo
-
-    try:
-        server = smtplib.SMTP_SSL('smtp.gmail.com', 465)
-        server.login(meu_email, minha_senha)
-        server.sendmail(meu_email, meu_email, msg.as_string())
-        server.quit()
-        return True
-    except:
-        return False
-
-def gerar_link_whatsapp(nome, plano):
-    texto = f"Olá Core Essence! Acabei de me cadastrar no Portal Radar 2026.\nNome: {nome}\nPlano Escolhido: {plano}.\nAguardo liberação!"
-    texto_url = urllib.parse.quote(texto)
-    # Substitua pelo seu número com código do país e DDD
-    return f"https://wa.me/5518991466238?text={texto_url}"
-
-if __name__ == "__main__":
-    executar()
