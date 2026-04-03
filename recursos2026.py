@@ -59,8 +59,8 @@ def exibir_recursos():
             st.write(f"📍 **UF:** {uf_nome_completo}")
         st.divider()
 
-    # Palavras-chave permitidas (sem códigos)
-    termos_limpos = ['ANO', 'TIPO', 'AUTOR', 'MUNICÍPIO', 'UF', 'EMPENHADO', 'PAGO']
+    # Termos permitidos (Trocado Município por Localidade de Aplicação)
+    termos_limpos = ['ANO', 'TIPO', 'AUTOR', 'LOCALIDADE DE APLICAÇÃO', 'UF', 'EMPENHADO', 'PAGO']
     lista_final = []
     
     try:
@@ -79,49 +79,4 @@ def exibir_recursos():
             # 2. FILTRO POR UF
             if not acesso_nacional:
                 col_uf_base = next((c for c in chunk.columns if c == 'UF'), None)
-                if col_uf_base:
-                    chunk = chunk[chunk[col_uf_base].astype(str).str.upper() == uf_nome_completo]
-
-            if chunk.empty: continue
-
-            # 3. SELEÇÃO DE COLUNAS "PURAS" (Bloqueia CÓDIGOS, ID e IBGE)
-            cols_selecionadas = []
-            for t in termos_limpos:
-                # Busca coluna que contém o termo, mas NÃO contém palavras de "código"
-                encontrada = next((c for c in chunk.columns if t in c 
-                                  and 'COD' not in c 
-                                  and 'ID' not in c 
-                                  and 'IBGE' not in c), None)
-                if encontrada:
-                    cols_selecionadas.append(encontrada)
-            
-            if cols_selecionadas:
-                lista_final.append(chunk[list(dict.fromkeys(cols_selecionadas))].copy())
-
-        df_base = pd.concat(lista_final, ignore_index=True) if lista_final else pd.DataFrame()
-
-    except Exception as e:
-        st.error(f"Erro técnico: {e}")
-        return
-
-    if df_base.empty:
-        st.warning(f"Nenhum dado encontrado para: {uf_nome_completo}")
-        return
-
-    # --- MÉTRICAS ---
-    col_p = next((c for c in df_base.columns if 'PAGO' in c), None)
-    col_e = next((c for c in df_base.columns if 'EMPENHADO' in c), None)
-
-    m1, m2 = st.columns(2)
-    label = "BRASIL" if acesso_nacional else uf_nome_completo
-    
-    if col_e:
-        total_e = df_base[col_e].apply(limpar_valor).sum()
-        m1.metric(f"Total Empenhado ({label})", f"R$ {total_e:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.'))
-    if col_p:
-        total_p = df_base[col_p].apply(limpar_valor).sum()
-        m2.metric(f"Total Pago ({label})", f"R$ {total_p:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.'))
-    
-    st.markdown("---") 
-    # Exibe a planilha limpa (Apenas nomes de Município e UF)
-    st.dataframe(df_base, use_container_width=True)
+                if
