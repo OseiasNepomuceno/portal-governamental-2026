@@ -69,4 +69,36 @@ def exibir_radar():
     plano = str(usuario.get('PLANO', 'BRONZE')).upper()
     sigla_usuario = str(usuario.get('LOCALIDADE') or "RJ").strip().upper()
     
-    # Converte para nome completo
+    # Converte para nome completo para bater com a planilha
+    nome_completo_busca = remover_acentos(MAPA_ESTADOS.get(sigla_usuario, sigla_usuario))
+    acesso_nacional = (plano in ["PREMIUM", "DIAMANTE", "OURO"])
+
+    # Identifica a coluna de UF (pode variar entre os dois arquivos)
+    coluna_uf = "UF" if "UF" in df.columns else "ESTADO" if "ESTADO" in df.columns else None
+
+    if coluna_uf:
+        if not acesso_nacional:
+            # Aplica normalização para garantir que nomes como 'RIO DE JANEIRO' funcionem
+            df['UF_BUSCA'] = df[coluna_uf].apply(remover_acentos)
+            df = df[df['UF_BUSCA'] == nome_completo_busca]
+            df = df.drop(columns=['UF_BUSCA'])
+            st.info(f"📍 Exibindo dados de: **{nome_completo_busca}**")
+        else:
+            st.success(f"✅ Acesso Nacional Liberado - {tipo_visao}")
+    else:
+        st.warning("Aviso: Coluna de localização não identificada para filtro automático.")
+
+    # 4. Exibição e Busca Interna
+    if df.empty:
+        st.warning(f"Nenhum registro encontrado em '{tipo_visao}' para sua região.")
+    else:
+        st.divider()
+        st.write(f"Total de registros: **{len(df)}**")
+        
+        # Filtro de busca textual rápido para o consultor
+        busca = st.text_input(f"🔍 Pesquisar em {tipo_visao} (Nome, CNPJ, Partido...):", placeholder="Digite para filtrar a tabela abaixo...")
+        if busca:
+            mask = df.astype(str).apply(lambda x: x.str.contains(busca, case=False)).any(axis=1)
+            df = df[mask]
+
+        st.dataframe(df, use_container_width=True, hide_index=True)
