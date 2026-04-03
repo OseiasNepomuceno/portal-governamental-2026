@@ -1,117 +1,96 @@
-# Arquivo Otimizado - Core Essence - Foco Município/UF 2026 - 03/04/2026
 import streamlit as st
 import pandas as pd
 import gdown
 import os
 
-def limpar_valor_monetario(v):
+def limpar_valor(v):
     if pd.isna(v) or str(v).strip() in ["", "0"]: 
         return 0.0
     try:
-        # Remove R$, pontos de milhar e ajusta a vírgula para ponto decimal
         v = str(v).upper().replace('R$', '').replace(' ', '').replace('.', '').replace(',', '.').strip()
         return float(v)
     except: 
         return 0.0
 
 def exibir_recursos():
-    st.title("📊 Radar de Recursos 2026 (Core Essence)")
+    st.title("📊 Radar de Recursos 2026")
     
     file_id = st.secrets.get("file_id_convenios")
     nome_arquivo = "20260320_Convenios.csv"
 
     if not file_id:
-        st.error("ID do arquivo não configurado nos Secrets.")
+        st.error("Configure 'file_id_convenios' nos Secrets.")
         return
 
-    # 1. DOWNLOAD DA BASE
     if not os.path.exists(nome_arquivo):
-        with st.spinner("Sincronizando base de dados..."):
+        with st.spinner("Baixando base de dados..."):
             url = f'https://drive.google.com/uc?id={file_id}'
-            try:
-                gdown.download(url, nome_arquivo, quiet=False, fuzzy=True)
-            except Exception as e:
-                st.error(f"Erro ao baixar base de dados: {e}")
-                return
+            gdown.download(url, nome_arquivo, quiet=False, fuzzy=True)
 
-    # 2. LOGIN E PERMISSÕES
     usuario = st.session_state.get('usuario_logado')
     if not usuario:
-        st.error("Usuário não identificado.")
+        st.error("Usuário não logado.")
         return
 
-    # Colunas que queremos exibir (Apenas os nomes, SEM CÓDIGOS)
-    termos_desejados = [
-        'ANO DA EMENDA', 'TIPO DA EMENDA', 'NOME DO AUTOR DA EMENDA', 
-        'MUNICÍPIO', 'UF', 'VALOR EMPENHADO', 'VALOR LIQUIDADO', 'VALOR PAGO'
-    ]
+    # CONFIGURAÇÃO DE COLUNAS (O que você quer ver)
+    alvos = ['ANO DA EMENDA', 'TIPO DA EMENDA', 'AUTOR', 'MUNICÍPIO', 'UF', 'EMPENHADO', 'LIQUIDADO', 'PAGO']
 
-    locais_bruto = usuario.get('local_liberado') or usuario.get('LOCAL_LIBERADO') or ""
+    locais_bruto = usuario.get('local_liberado', '')
     locais_limpos = [c.strip().upper() for c in str(locais_bruto).split(',') if c.strip()]
     plano = str(usuario.get('PLANO', 'BRONZE')).upper()
     ver_tudo = "BRASIL" in locais_limpos or plano in ["OURO", "ADMIN", "MASTER"]
 
-    lista_pedacos = []
+    lista_final = []
     
     try:
-        status = st.empty()
-        # Lendo em blocos para performance
-        reader = pd.read_csv(nome_arquivo, sep=None, engine='python', encoding='latin1', 
-                             on_bad_lines='skip', chunksize=80000)
+        # Lendo em blocos para não travar a memória
+        reader = pd.read_csv(nome_arquivo, sep=None, engine='python', encoding='latin1', on_bad_lines='skip', chunksize=85000)
         
-        for i, chunk in enumerate(reader):
-            status.info(f"Filtrando Ciclo 2026... Bloco {i+1}")
-            
-            # Padroniza cabeçalhos (Maiúsculo e sem espaços)
+        for chunk in reader:
+            # 1. Padroniza colunas (Tira espaços e põe em Maiúsculo)
             chunk.columns = [str(c).upper().strip() for c in chunk.columns]
             
-            # FILTRO 1: Somente Ano 2026
-            col_ano = next((c for c in chunk.columns if 'ANO' in c and 'EMENDA' in c), None)
+            # 2. FILTRO ANO 2026
+            col_ano = next((c for c in chunk.columns if 'ANO' in c), None)
             if col_ano:
                 chunk = chunk[chunk[col_ano].astype(str).str.contains('2026', na=False)]
-
+            
             if chunk.empty:
                 continue
 
-            # FILTRO 2: Localidade (Bronze/Prata)
+            # 3. FILTRO LOCALIDADE
             if not ver_tudo:
-                # Busca a coluna de município ignorando colunas de código/IBGE
                 col_mun_filtro = next((c for c in chunk.columns if 'MUNICI' in c and 'COD' not in c and 'IBGE' not in c), None)
                 if col_mun_filtro:
-                    padrao = '|'.join(locais_limpos)
-                    chunk = chunk[chunk[col_mun_filtro].astype(str).str.upper().str.contains(padrao, na=False)]
+                    busca = '|'.join(locais_limpos)
+                    chunk = chunk[chunk[col_mun_filtro].astype(str).str.upper().str.contains(busca, na=False)]
 
-            # SELEÇÃO FINAL: Bloqueia colunas com 'COD', 'IBGE' ou 'ID'
-            cols_finais = []
-            for termo in termos_desejados:
-                # Encontra a coluna que contém o termo, mas NÃO é uma coluna de código numérico
-                encontrada = next((c for c in chunk.columns if termo in c and 'COD' not in c and 'IBGE' not in c and 'ID' not in c), None)
+            # 4. SELEÇÃO DE COLUNAS (Bloqueia códigos IBGE/IDs)
+            cols_ok = []
+            for a in alvos:
+                encontrada = next((c for c in chunk.columns if a in c and 'COD' not in c and 'IBGE' not in c and 'ID' not in c), None)
                 if encontrada:
-                    cols_finais.append(encontrada)
+                    cols_ok.append(encontrada)
             
-            # Remove duplicatas e garante que a ordem seja respeitada
-            cols_finais = list(dict.fromkeys(cols_finais))
+            cols_ok = list(dict.fromkeys(cols_ok)) # Remove duplicatas
             
-            if cols_finais:
-                chunk_f = chunk[cols_finais].copy()
-                if not chunk_f.empty:
-                    lista_pedacos.append(chunk_f)
+            if cols_ok:
+                lista_final.append(chunk[cols_ok].copy())
 
-        status.empty()
-        df_base = pd.concat(lista_pedacos, ignore_index=True) if lista_pedacos else pd.DataFrame()
+        df_base = pd.concat(lista_final, ignore_index=True) if lista_final else pd.DataFrame()
 
     except Exception as e:
-        st.error(f"Erro no processamento: {e}")
+        st.error(f"Erro: {e}")
         return
 
     if df_base.empty:
-        st.warning(f"Nenhum recurso de 2026 localizado para: {locais_limpos}")
+        st.warning(f"Sem dados de 2026 para: {locais_limpos}")
         return
 
     # --- EXIBIÇÃO ---
-    col_pago = next((c for c in df_base.columns if 'VALOR PAGO' in c), None)
-    if col_pago:
-        v_soma = df_base[col_pago].apply(limpar_valor_monetario).sum()
-        st.metric("Total Pago em 2026", f"R$ {v_soma:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.'))
+    col_p = next((c for c in df_base.columns if 'PAGO' in c), None)
+    if col_p:
+        v_total = df_base[col_p].apply(limpar_valor).sum()
+        st.metric("Total Pago em 2026", f"R$ {v_total:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.'))
     
     st.dataframe(df_base, use_container_width=True)
