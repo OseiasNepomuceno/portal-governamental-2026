@@ -3,132 +3,33 @@ import pandas as pd
 import gdown
 import os
 
-# Dicionário de conversão (Sigla -> Nome na Base de Dados)
-DE_PARA_UF = {
-    'AC': 'ACRE', 'AL': 'ALAGOAS', 'AP': 'AMAPA', 'AM': 'AMAZONAS', 'BA': 'BAHIA',
-    'CE': 'CEARA', 'DF': 'DISTRITO FEDERAL', 'ES': 'ESPIRITO SANTO', 'GO': 'GOIAS',
-    'MA': 'MARANHAO', 'MT': 'MATO GROSSO', 'MS': 'MATO GROSSO DO SUL', 'MG': 'MINAS GERAIS',
-    'PA': 'PARA', 'PB': 'PARAIBA', 'PR': 'PARANA', 'PE': 'PERNAMBUCO', 'PI': 'PIAUI',
-    'RJ': 'RIO DE JANEIRO', 'RN': 'RIO GRANDE DO NORTE', 'RS': 'RIO GRANDE DO SUL',
-    'RO': 'RONDONIA', 'RR': 'RORAIMA', 'SC': 'SANTA CATARINA', 'SP': 'SAO PAULO',
-    'SE': 'SERGIPE', 'TO': 'TOCANTINS'
-}
-
-def limpar_valor(v):
-    if pd.isna(v) or str(v).strip() in ["", "0"]: 
-        return 0.0
-    try:
-        v = str(v).upper().replace('R$', '').replace(' ', '').replace('.', '').replace(',', '.').strip()
-        return float(v)
-    except: 
-        return 0.0
-
 def exibir_recursos():
-    st.title("📊 Radar de Recursos 2026")
+    st.title("🔍 Diagnóstico de Colunas - Radar 2026")
     
     file_id = st.secrets.get("file_id_convenios")
     nome_arquivo = "20260320_Convenios.csv"
 
     if not os.path.exists(nome_arquivo):
-        with st.spinner("Sincronizando Base de Dados Nacional..."):
+        with st.spinner("Baixando arquivo para análise..."):
             url = f'https://drive.google.com/uc?id={file_id}'
             gdown.download(url, nome_arquivo, quiet=False, fuzzy=True)
 
-    usuario = st.session_state.get('usuario_logado')
-    if not usuario:
-        st.error("Usuário não logado.")
-        return
-
-    # --- DADOS DO USUÁRIO ---
-    nome_usuario = str(usuario.get('NOME') or usuario.get('USUARIO') or "Consultor").upper()
-    plano = str(usuario.get('PLANO', 'BÁSICO')).upper()
-    uf_sigla = str(usuario.get('UF_LIBERADA') or usuario.get('UF') or "").strip().upper()
-    uf_nome_completo = DE_PARA_UF.get(uf_sigla, uf_sigla)
-    
-    acesso_nacional = (plano == "PREMIUM" or uf_sigla == "BRASIL")
-
-    # --- MENU LATERAL ---
-    with st.sidebar:
-        st.divider()
-        st.markdown("### 👤 Área do Consultor")
-        st.info(f"**LOGIN:** {nome_usuario}")
-        if acesso_nacional:
-            st.success("✅ **PLANO:** PREMIUM (NACIONAL)")
-        else:
-            st.warning(f"💼 **PLANO:** BÁSICO (ESTADUAL)")
-            st.write(f"📍 **UF LIBERADA:** {uf_nome_completo}")
-        st.divider()
-
-    # Definição das colunas desejadas (A Localidade é a prioridade)
-    # Bloqueamos Município para não repetir
-    termos_busca = ['ANO', 'TIPO', 'AUTOR', 'LOCALIDADE DE APLICAÇÃO', 'UF', 'EMPENHADO', 'PAGO']
-    lista_final = []
-    
     try:
-        reader = pd.read_csv(nome_arquivo, sep=None, engine='python', encoding='latin1', on_bad_lines='skip', chunksize=150000)
+        # Lemos apenas as primeiras 5 linhas para ser instantâneo
+        df_teste = pd.read_csv(nome_arquivo, sep=None, engine='python', encoding='latin1', nrows=5)
         
-        for chunk in reader:
-            # Padroniza nomes de colunas (Maiúsculas e sem espaços extras)
-            chunk.columns = [str(c).upper().strip() for c in chunk.columns]
-            
-            # 1. Filtro de Ano (2026)
-            col_ano = next((c for c in chunk.columns if 'ANO' in c), None)
-            if col_ano:
-                chunk = chunk[chunk[col_ano].astype(str).str.contains('2026', na=False)]
-            
-            if chunk.empty: continue
+        st.write("### ✅ Arquivo lido com sucesso!")
+        st.write("Abaixo estão os nomes exatos das colunas encontradas na sua base de dados:")
+        
+        # Exibe a lista de colunas para você me copiar e mandar
+        colunas = list(df_teste.columns)
+        st.json(colunas) 
 
-            # 2. Filtro de UF (Trava Estadual)
-            if not acesso_nacional:
-                col_uf_csv = next((c for c in chunk.columns if c == 'UF'), None)
-                if col_uf_csv:
-                    chunk = chunk[chunk[col_uf_csv].astype(str).str.upper() == uf_nome_completo]
-
-            if chunk.empty: continue
-
-            # 3. Seleção das Colunas Reais
-            cols_selecionadas = []
-            for t in termos_busca:
-                # Busca a coluna que contém o termo, mas BLOQUEIA CÓDIGOS e MUNICÍPIO
-                encontrada = next((c for c in chunk.columns if t in c 
-                                  and 'COD' not in c 
-                                  and 'ID' not in c 
-                                  and 'MUNICÍPIO' not in c), None)
-                if encontrada:
-                    cols_selecionadas.append(encontrada)
-            
-            # Caso a Localidade falhe por algum erro na base, ele tenta Município como segurança final
-            if not any('LOCALIDADE' in c for c in cols_selecionadas):
-                reserva = next((c for c in chunk.columns if 'MUNICÍPIO' in c and 'COD' not in c), None)
-                if reserva: cols_selecionadas.append(reserva)
-
-            if cols_selecionadas:
-                lista_final.append(chunk[list(dict.fromkeys(cols_selecionadas))].copy())
-
-        df_base = pd.concat(lista_final, ignore_index=True) if lista_final else pd.DataFrame()
+        st.write("---")
+        st.write("### 📋 Prévia dos Dados (Primeiras linhas):")
+        st.dataframe(df_teste.head(3))
+        
+        st.warning("👉 **Oseias:** Por favor, copie a lista de nomes que apareceu acima (no quadro preto) e cole aqui no chat para eu ajustar o filtro de UF e Localidade com perfeição.")
 
     except Exception as e:
-        st.error(f"Erro no processamento dos dados: {e}")
-        return
-
-    if df_base.empty:
-        st.warning(f"Nenhum dado encontrado para {uf_nome_completo} em 2026.")
-        return
-
-    # --- MÉTRICAS ---
-    col_p = next((c for c in df_base.columns if 'PAGO' in c), None)
-    col_e = next((c for c in df_base.columns if 'EMPENHADO' in c), None)
-
-    m1, m2 = st.columns(2)
-    label_local = "BRASIL" if acesso_nacional else uf_nome_completo
-    
-    if col_e:
-        v_e = df_base[col_e].apply(limpar_valor).sum()
-        m1.metric(f"Total Empenhado ({label_local})", f"R$ {v_e:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.'))
-    if col_p:
-        v_p = df_base[col_p].apply(limpar_valor).sum()
-        m2.metric(f"Total Pago ({label_local})", f"R$ {v_p:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.'))
-    
-    st.markdown("---") 
-    # Exibe a planilha com a Localidade de Aplicação do Recurso
-    st.dataframe(df_base, use_container_width=True)
+        st.error(f"Erro ao ler o arquivo: {e}")
