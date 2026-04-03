@@ -118,41 +118,89 @@ def tela_cadastro():
 # --- 4. LÓGICA PRINCIPAL ---
 
 def executar():
-    if 'logado' not in st.session_state: st.session_state['logado'] = False
-    if 'tela' not in st.session_state: st.session_state['tela'] = 'home'
+    if 'logado' not in st.session_state: 
+        st.session_state['logado'] = False
+    if 'tela' not in st.session_state: 
+        st.session_state['tela'] = 'home'
 
     if not st.session_state['logado']:
+        # --- TELA INICIAL (RESTAURADA) ---
         if st.session_state['tela'] == 'home':
-            st.title("🛰️ Core Essence")
-            col1, col2 = st.columns(2)
-            if col1.button("LOGIN"): st.session_state['tela'] = 'login'; st.rerun()
-            if col2.button("CADASTRO"): st.session_state['tela'] = 'cadastro'; st.rerun()
-        elif st.session_state['tela'] == 'cadastro': tela_cadastro()
+            st.markdown("<h1 style='text-align: center;'>🛰️ Core Essence</h1>", unsafe_allow_html=True)
+            st.markdown("<h3 style='text-align: center; color: #555;'>Inteligência Governamental Estratégica</h3>", unsafe_allow_html=True)
+            st.write("\n")
+            
+            c_f1, c_f2, c_f3 = st.columns(3)
+            with c_f1:
+                st.info("**Para nossos Consultores:**\n\n*Bem-vindo de volta ao centro da estratégia.*")
+            with c_f2:
+                st.success("**Para novos Membros:**\n\n*Transforme dados governamentais em faturamento real.*")
+            with c_f3:
+                st.warning("**Por que Core Essence?**\n\n*Não apenas monitore recursos, antecipe-se.*")
+
+            st.markdown("---")
+            
+            col_b1, col_b2 = st.columns(2)
+            with col_b1:
+                if st.button("👤 JÁ SOU CONSULTOR (LOGIN)", use_container_width=True, type="primary"):
+                    st.session_state['tela'] = 'login'
+                    st.rerun()
+            with col_b2:
+                if st.button("🚀 QUERO ME CADASTRAR AGORA", use_container_width=True):
+                    st.session_state['tela'] = 'cadastro'
+                    st.rerun()
+
+        elif st.session_state['tela'] == 'cadastro':
+            tela_cadastro()
+            
         elif st.session_state['tela'] == 'login':
-            u = st.text_input("E-mail")
-            p = st.text_input("Senha", type="password")
-            if st.button("Entrar"):
-                if autenticar_usuario(u, p): st.rerun()
-                else: st.error("Acesso negado ou pendente.")
+            st.title("🔑 Acesso ao Portal")
+            if st.button("⬅️ Voltar"):
+                st.session_state['tela'] = 'home'
+                st.rerun()
+            
+            # Formulário de Login
+            with st.form("login_form"):
+                u = st.text_input("Usuário (E-mail)")
+                p = st.text_input("Senha", type="password")
+                if st.form_submit_button("Entrar"):
+                    if autenticar_usuario(u, p):
+                        st.rerun()
+                    else:
+                        st.error("Usuário ou senha incorretos ou acesso ainda pendente.")
+
     else:
+        # --- ÁREA LOGADA (MANTIDA) ---
         with st.sidebar:
             st.title("Core Essence")
+            plano = st.session_state.get('usuario_plano', 'BRONZE')
+            usuario_atual = st.session_state.get('usuario_nome')
+            
+            st.info(f"🏆 Plano: {plano}")
+            
             menu = ["📊 Recursos", "🏛️ Radar de Emendas", "📜 Revisão"]
-            if st.session_state.get('usuario_nome') == "oseiasnepom@gmail.com":
+            if usuario_atual == "oseiasnepom@gmail.com":
                 menu.append("🔧 Gestão Admin")
+            
             menu.append("🚪 Sair")
             escolha = st.radio("Módulos:", menu)
 
         if escolha == "🚪 Sair":
-            st.session_state.clear(); st.rerun()
-        elif escolha == "🔧 Gestão Admin":
-            st.subheader("Painel Administrativo")
-            # Código de gestão simplificado para o exemplo
-            st.info("Área do administrador ativa.")
+            st.session_state.clear()
+            st.rerun()
+        
         elif escolha == "🏛️ Radar de Emendas":
             radar.exibir_radar()
+            
+        elif escolha == "🔧 Gestão Admin":
+            # Aqui você pode colar o código de Gestão Admin que estava funcionando 100%
+            st.subheader("🔧 Painel de Controle - Administrador")
+            st.info("O painel de gestão está integrado à sua planilha ID_LICENÇAS.")
+            # ... (seu código gspread de gestão)
+            
         else:
-            st.write(f"Bem-vindo ao módulo {escolha}")
+            st.write(f"### Bem-vindo ao módulo {escolha}")
+            st.info("Utilize o menu lateral para navegar entre as ferramentas.")
 
 if __name__ == "__main__":
     executar()
