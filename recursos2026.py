@@ -59,19 +59,15 @@ def exibir_recursos():
             st.write(f"📍 **UF:** {uf_nome_completo}")
         st.divider()
 
-    # Nomes flexíveis para encontrar as colunas mesmo com acentos
-    alvos = ['ANO', 'TIPO', 'AUTOR', 'MUNICÍPIO', 'MUNICIPIO', 'UF', 'EMPENHADO', 'PAGO']
+    # Palavras-chave permitidas (sem códigos)
+    termos_limpos = ['ANO', 'TIPO', 'AUTOR', 'MUNICÍPIO', 'UF', 'EMPENHADO', 'PAGO']
     lista_final = []
     
     try:
-        # Aumentei o chunksize para garantir que ele pegue mais dados por vez
         reader = pd.read_csv(nome_arquivo, sep=None, engine='python', encoding='latin1', on_bad_lines='skip', chunksize=150000)
         
         for chunk in reader:
-            # Mantém os nomes originais para busca, mas cria uma versão upper para comparar
-            cols_originais = chunk.columns
-            cols_upper = [str(c).upper().strip() for c in cols_originais]
-            chunk.columns = cols_upper # Padroniza temporariamente
+            chunk.columns = [str(c).upper().strip() for c in chunk.columns]
             
             # 1. FILTRO ANO 2026
             col_ano = next((c for c in chunk.columns if 'ANO' in c), None)
@@ -80,25 +76,27 @@ def exibir_recursos():
             
             if chunk.empty: continue
 
-            # 2. FILTRO POR UF (RIGOROSO)
+            # 2. FILTRO POR UF
             if not acesso_nacional:
-                # Busca a coluna UF exata
                 col_uf_base = next((c for c in chunk.columns if c == 'UF'), None)
                 if col_uf_base:
                     chunk = chunk[chunk[col_uf_base].astype(str).str.upper() == uf_nome_completo]
 
             if chunk.empty: continue
 
-            # 3. SELEÇÃO DE COLUNAS (Incluindo 'Município' com acento)
-            cols_para_exibir = []
-            for item in ['ANO', 'TIPO', 'AUTOR', 'MUNICÍPIO', 'UF', 'EMPENHADO', 'PAGO']:
-                # Busca qualquer coluna que contenha a palavra chave (ex: encontra 'Município' se buscar 'MUNICÍPIO')
-                encontrada = next((c for c in chunk.columns if item in c and 'COD' not in c), None)
+            # 3. SELEÇÃO DE COLUNAS "PURAS" (Bloqueia CÓDIGOS, ID e IBGE)
+            cols_selecionadas = []
+            for t in termos_limpos:
+                # Busca coluna que contém o termo, mas NÃO contém palavras de "código"
+                encontrada = next((c for c in chunk.columns if t in c 
+                                  and 'COD' not in c 
+                                  and 'ID' not in c 
+                                  and 'IBGE' not in c), None)
                 if encontrada:
-                    cols_para_exibir.append(encontrada)
+                    cols_selecionadas.append(encontrada)
             
-            if cols_para_exibir:
-                lista_final.append(chunk[list(dict.fromkeys(cols_para_exibir))].copy())
+            if cols_selecionadas:
+                lista_final.append(chunk[list(dict.fromkeys(cols_selecionadas))].copy())
 
         df_base = pd.concat(lista_final, ignore_index=True) if lista_final else pd.DataFrame()
 
@@ -110,8 +108,7 @@ def exibir_recursos():
         st.warning(f"Nenhum dado encontrado para: {uf_nome_completo}")
         return
 
-    # --- MÉTRICAS E TABELA ---
-    # Identifica colunas financeiras para soma
+    # --- MÉTRICAS ---
     col_p = next((c for c in df_base.columns if 'PAGO' in c), None)
     col_e = next((c for c in df_base.columns if 'EMPENHADO' in c), None)
 
@@ -126,4 +123,5 @@ def exibir_recursos():
         m2.metric(f"Total Pago ({label})", f"R$ {total_p:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.'))
     
     st.markdown("---") 
+    # Exibe a planilha limpa (Apenas nomes de Município e UF)
     st.dataframe(df_base, use_container_width=True)
