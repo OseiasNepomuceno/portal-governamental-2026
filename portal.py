@@ -133,11 +133,10 @@ def autenticar_usuario(usuario_digitado, senha_digitada):
 # --- 3. CONFIGURAÇÃO DA PÁGINA ---
 st.set_page_config(page_title="Core Essence | Inteligência Governamental", page_icon="🛰️", layout="wide")
 
-# --- 4. TELA DE CADASTRO (ATUALIZADA: BÁSICO & PREMIUM) ---
+# --- 4. TELA DE CADASTRO (ATUALIZADA: BÁSICO ESTADUAL & PREMIUM NACIONAL) ---
 def tela_cadastro():
     st.markdown("<h2 style='text-align: center; color: #28a745;'>🚀 Iniciar Nova Consultoria</h2>", unsafe_allow_html=True)
     
-    # Links de pagamento atualizados
     links_pagamento = {
         "BÁSICO": "https://mpago.la/1gf9ryq", 
         "PREMIUM": "https://mpago.la/2CUKQgx"
@@ -148,16 +147,15 @@ def tela_cadastro():
         st.rerun()
 
     if not st.session_state.get('cadastro_concluido', False):
-        # Exibição comparativa dos planos
         col_p1, col_p2 = st.columns(2)
         
         with col_p1:
             st.markdown("""
                 <div style="background-color: #f8f9fa; padding: 15px; border-radius: 10px; border-top: 5px solid #6c757d; min-height: 220px;">
                     <h4 style="color: #495057; margin:0;">🌱 PLANO BÁSICO</h4>
-                    <p style="font-size: 13px; color: #666;">Essencial para monitoramento regional.</p>
+                    <p style="font-size: 13px; color: #666;">Essencial para monitoramento estadual.</p>
                     <ul style="font-size: 12px; color: #444;">
-                        <li>Radar de Emendas (03 Cidades)</li>
+                        <li><b>Radar de Emendas:</b> Inclui todas as cidades do estado escolhido</li>
                         <li>Monitoramento de Recursos 2026</li>
                         <li>Até 50 Revisões de Estatuto por IA</li>
                     </ul>
@@ -170,7 +168,7 @@ def tela_cadastro():
                     <h4 style="color: #007bff; margin:0;">💎 PLANO PREMIUM</h4>
                     <p style="font-size: 13px; color: #666;">Acesso total e inteligência avançada.</p>
                     <ul style="font-size: 12px; color: #444;">
-                        <li>Acesso Nacional (Brasil Inteiro)</li>
+                        <li><b>Acesso Nacional:</b> Todos os estados e municípios do Brasil</li>
                         <li>Inteligência de Dados Prioritária</li>
                         <li>Até 150 Revisões de Estatuto por IA</li>
                     </ul>
@@ -180,8 +178,8 @@ def tela_cadastro():
         st.write("\n")
         
         opcoes = {
-            "PLANO BÁSICO (Monitoramento Regional)": "BÁSICO", 
-            "PLANO PREMIUM (Acesso Nacional + IA)": "PREMIUM"
+            "PLANO BÁSICO (Monitoramento Estadual Completo)": "BÁSICO", 
+            "PLANO PREMIUM (Acesso Nacional + IA Avançada)": "PREMIUM"
         }
         escolha_v = st.selectbox("Selecione o plano desejado:", list(opcoes.keys()))
         plano_f = opcoes[escolha_v]
@@ -190,7 +188,7 @@ def tela_cadastro():
             nome = st.text_input("Nome Completo")
             email = st.text_input("E-mail (Login)")
             senha = st.text_input("Senha", type="password")
-            local = st.text_input("Local de Atuação (Cidade ou UF)")
+            local = st.text_input("Local de Atuação (UF no Básico ou NACIONAL no Premium)")
             
             enviado = st.form_submit_button("PRÓXIMO PASSO: PAGAMENTO ➡️", use_container_width=True)
             
@@ -225,7 +223,6 @@ def executar():
             st.markdown("<h3 style='text-align: center;'>Inteligência Governamental Estratégica</h3>", unsafe_allow_html=True)
             st.write("\n")
 
-            # --- CARDS DE ENTRADA ---
             col1, col2, col3 = st.columns(3)
 
             with col1:
@@ -279,7 +276,6 @@ def executar():
                         st.error("Erro no login ou ativação pendente.")
 
     else:
-        # --- ÁREA LOGADA ---
         with st.sidebar:
             st.title("Core Essence")
             
