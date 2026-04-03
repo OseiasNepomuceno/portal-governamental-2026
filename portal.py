@@ -8,6 +8,7 @@ import smtplib
 from email.mime.text import MIMEText
 import urllib.parse
 from google.oauth2.service_account import Credentials
+import radar  # Adicione isso logo abaixo dos outros imports
 
 # --- 1. FUNÇÕES DE APOIO (CONEXÃO GOOGLE E NOTIFICAÇÕES) ---
 
