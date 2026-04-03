@@ -1,4 +1,4 @@
-# Arquivo Otimizado - Core Essence - Somente Nomes de Localidade - 03/04/2026
+# Arquivo Otimizado - Core Essence - Foco Município/UF 2026 - 03/04/2026
 import streamlit as st
 import pandas as pd
 import gdown
@@ -40,7 +40,7 @@ def exibir_recursos():
         st.error("Usuário não identificado.")
         return
 
-    # Colunas que queremos exibir (Apenas os nomes, sem IDs ou códigos)
+    # Colunas que queremos exibir (Apenas os nomes, SEM CÓDIGOS)
     termos_desejados = [
         'ANO DA EMENDA', 'TIPO DA EMENDA', 'NOME DO AUTOR DA EMENDA', 
         'MUNICÍPIO', 'UF', 'VALOR EMPENHADO', 'VALOR LIQUIDADO', 'VALOR PAGO'
@@ -60,9 +60,9 @@ def exibir_recursos():
                              on_bad_lines='skip', chunksize=80000)
         
         for i, chunk in enumerate(reader):
-            status.info(f"Processando Ciclo 2026... Bloco {i+1}")
+            status.info(f"Filtrando Ciclo 2026... Bloco {i+1}")
             
-            # Padroniza cabeçalhos
+            # Padroniza cabeçalhos (Maiúsculo e sem espaços)
             chunk.columns = [str(c).upper().strip() for c in chunk.columns]
             
             # FILTRO 1: Somente Ano 2026
@@ -73,7 +73,7 @@ def exibir_recursos():
             if chunk.empty:
                 continue
 
-            # FILTRO 2: Localidade (Regra Bronze/Prata)
+            # FILTRO 2: Localidade (Bronze/Prata)
             if not ver_tudo:
                 # Busca a coluna de município ignorando colunas de código/IBGE
                 col_mun_filtro = next((c for c in chunk.columns if 'MUNICI' in c and 'COD' not in c and 'IBGE' not in c), None)
@@ -81,15 +81,15 @@ def exibir_recursos():
                     padrao = '|'.join(locais_limpos)
                     chunk = chunk[chunk[col_mun_filtro].astype(str).str.upper().str.contains(padrao, na=False)]
 
-            # SELEÇÃO FINAL: Bloqueia explicitamente colunas com 'COD', 'IBGE' ou 'ID'
+            # SELEÇÃO FINAL: Bloqueia colunas com 'COD', 'IBGE' ou 'ID'
             cols_finais = []
             for termo in termos_desejados:
-                # Encontra a coluna que contém o termo desejado, mas que NÃO seja uma coluna de código
+                # Encontra a coluna que contém o termo, mas NÃO é uma coluna de código numérico
                 encontrada = next((c for c in chunk.columns if termo in c and 'COD' not in c and 'IBGE' not in c and 'ID' not in c), None)
                 if encontrada:
                     cols_finais.append(encontrada)
             
-            # Remove duplicatas da lista de colunas
+            # Remove duplicatas e garante que a ordem seja respeitada
             cols_finais = list(dict.fromkeys(cols_finais))
             
             if cols_finais:
@@ -105,4 +105,13 @@ def exibir_recursos():
         return
 
     if df_base.empty:
-        st.warning(f"Nenhum recurso de 2026 localizado para: {locais
+        st.warning(f"Nenhum recurso de 2026 localizado para: {locais_limpos}")
+        return
+
+    # --- EXIBIÇÃO ---
+    col_pago = next((c for c in df_base.columns if 'VALOR PAGO' in c), None)
+    if col_pago:
+        v_soma = df_base[col_pago].apply(limpar_valor_monetario).sum()
+        st.metric("Total Pago em 2026", f"R$ {v_soma:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.'))
+    
+    st.dataframe(df_base, use_container_width=True)
