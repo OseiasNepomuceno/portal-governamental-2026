@@ -1,4 +1,4 @@
-# Arquivo Restaurado - Core Essence - Versão Estável de Ontem - 03/04/2026
+# Arquivo Restaurado e Reforçado - Core Essence - 03/04/2026
 import streamlit as st
 import pandas as pd
 import gdown
@@ -18,19 +18,25 @@ def exibir_recursos():
     nome_arquivo = "20260320_Convenios.csv"
     file_id = st.secrets.get("file_id_convenios")
     
-    # 1. DOWNLOAD (O mesmo método de ontem)
+    # 1. DOWNLOAD REFORÇADO (Para evitar FileURLRetrievalError)
     if not os.path.exists(nome_arquivo):
         with st.spinner("Sincronizando base de dados..."):
             url = f'https://drive.google.com/uc?id={file_id}'
-            gdown.download(url, nome_arquivo, quiet=True)
+            try:
+                # fuzzy=True ajuda a encontrar o arquivo mesmo com IDs problemáticos
+                gdown.download(url, nome_arquivo, quiet=False, fuzzy=True)
+            except Exception as e:
+                st.error(f"Erro ao baixar base de dados: {e}")
+                st.info("Certifique-se de que o arquivo no Drive está como 'Qualquer pessoa com o link'.")
+                return
 
-    # 2. LOGIN E PERMISSÕES (Recuperando do Session State)
+    # 2. LOGIN E PERMISSÕES
     usuario = st.session_state.get('usuario_logado')
     if not usuario:
         st.warning("Efetue o login para acessar.")
         return
 
-    # Pegamos os locais exatamente como estão na sua planilha (Com acento agora, como você mudou)
+    # Recupera locais e remove qualquer espaço em branco indesejado
     locais_liberados = str(usuario.get('local_liberado', '')).upper().split(',')
     locais_limpos = [c.strip() for c in locais_liberados if c.strip()]
     
@@ -40,27 +46,32 @@ def exibir_recursos():
     
     try:
         status = st.empty()
-        # Lendo em blocos de 60 mil linhas (Única trava de segurança necessária)
+        # Lendo em blocos para performance e memória
         reader = pd.read_csv(nome_arquivo, sep=None, engine='python', encoding='latin1', 
                              on_bad_lines='skip', chunksize=60000)
         
         for i, chunk in enumerate(reader):
-            status.info(f"Filtrando dados... Bloco {i+1}")
+            status.info(f"Processando dados... Bloco {i+1}")
             
-            # Padroniza as colunas para maiúsculo (como ontem)
+            # Limpa nomes das colunas
             chunk.columns = [str(c).upper().strip() for c in chunk.columns]
             
-            # Identifica a coluna Município
+            # Localiza coluna de município de forma flexível
             col_mun = next((c for c in chunk.columns if 'MUNICI' in c), None)
 
             if col_mun:
-                # LÓGICA DE ONTEM: Busca parcial por "Contém"
-                # O '|'.join cria um filtro 'OU' (NITERÓI ou RIO DE JANEIRO ou PETRÓPOLIS)
+                # Converte coluna para string e maiúsculo para comparação
+                chunk[col_mun] = chunk[col_mun].astype(str).str.upper()
+                
                 if plano in ["BRONZE", "PRATA"]:
-                    padrao_busca = '|'.join(locais_limpos)
-                    # Verifica se o texto da planilha está contido no texto do CSV
-                    chunk_f = chunk[chunk[col_mun].astype(str).str.upper().str.contains(padrao_busca, na=False)].copy()
+                    if locais_limpos:
+                        # Join com '|' faz o papel de "OU" (Ex: NITERÓI ou RIO DE JANEIRO)
+                        padrao_busca = '|'.join(locais_limpos)
+                        chunk_f = chunk[chunk[col_mun].str.contains(padrao_busca, na=False)].copy()
+                    else:
+                        chunk_f = pd.DataFrame()
                 else:
+                    # Plano OURO/ADMIN vê tudo
                     chunk_f = chunk.copy()
 
                 if not chunk_f.empty:
@@ -70,22 +81,15 @@ def exibir_recursos():
         df_base = pd.concat(lista_pedacos, ignore_index=True) if lista_pedacos else pd.DataFrame()
 
     except Exception as e:
-        st.error(f"Erro técnico: {e}")
+        st.error(f"Erro técnico no processamento: {e}")
         return
 
     # 3. EXIBIÇÃO
     if df_base.empty:
         st.error(f"❌ Nenhum dado encontrado para: {locais_limpos}")
-        st.info("Verifique se as cidades na planilha de usuários estão idênticas às do CSV.")
         return
 
-    # Tratamento de valores
+    # Tratamento de valores para somatória
     col_valor = next((c for c in df_base.columns if 'VALOR' in c), None)
     if col_valor:
-        df_base['VALOR_NUM'] = df_base[col_valor].apply(limpar_valor_monetario)
-
-    # Dashboard e Tabela
-    total = df_base['VALOR_NUM'].sum() if 'VALOR_NUM' in df_base.columns else 0
-    st.metric("Soma Total dos Recursos", f"R$ {total:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.'))
-    
-    st.dataframe(df_base.drop(columns=['VALOR_NUM'], errors='ignore'), use_container_width=True)
+        df_base['VALOR_NUM'] = df_base[col_valor].apply
