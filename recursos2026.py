@@ -2,7 +2,6 @@ import streamlit as st
 import pandas as pd
 import gdown
 import os
-from datetime import datetime
 
 # Dicionário de tradução para interface
 DE_PARA_UF = {
@@ -59,41 +58,41 @@ def exibir_recursos():
             st.write(f"📍 **UF:** {uf_nome_completo}")
         st.divider()
 
-    # --- COLUNAS SOLICITADAS ---
+    # --- COLUNAS CONFIGURADAS PARA CONVÊNIOS ---
     colunas_finais = [
         "UF", "NOME MUNICÍPIO", "SITUAÇÃO CONVÊNIO", "OBJETO DO CONVÊNIO", 
         "NOME ÓRGÃO SUPERIOR", "NOME CONVENENTE", "VALOR CONVÊNIO", 
         "VALOR LIBERADO", "DATA PUBLICAÇÃO", "DATA INÍCIO VIGÊNCIA", "DATA FINAL VIGÊNCIA"
     ]
     
+    lista_dados = []
+    
     try:
-        # Leitura inicial para carregar os dados
-        lista_dados = []
+        # Leitura em blocos para performance
         reader = pd.read_csv(nome_arquivo, sep=None, engine='python', encoding='latin1', on_bad_lines='skip', chunksize=150000)
         
         for chunk in reader:
-            # 1. Filtro Travado: DATA PUBLICAÇÃO contém 2026
-            col_pub = next((c for c in chunk.columns if "DATA PUBLICAÇÃO" in c.upper()), None)
-            if col_pub:
-                chunk = chunk[chunk[col_pub].astype(str).str.contains('2026', na=False)]
-            
-            if chunk.empty: continue
-
-            # 2. Filtro de UF (Apenas se não for Premium)
-            if not acesso_nacional:
-                col_uf = next((c for c in chunk.columns if c.upper() == "UF"), None)
-                if col_uf:
-                    chunk = chunk[chunk[col_uf].astype(str).str.upper() == uf_sigla]
-
-            if chunk.empty: continue
-
-            # Padronização de nomes de colunas para seleção
+            # Padroniza nomes das colunas
             chunk.columns = [c.upper().strip() for c in chunk.columns]
-            # Mapeia "MUNICIPIO" sem acento para "NOME MUNICÍPIO" se necessário
+            
+            # Tratamento para variações de nome da coluna Município
             if "MUNICIPIO" in chunk.columns and "NOME MUNICÍPIO" not in chunk.columns:
                 chunk = chunk.rename(columns={"MUNICIPIO": "NOME MUNICÍPIO"})
 
-            # Seleciona apenas o que existe das colunas solicitadas
+            # 1. Filtro Mandatório: DATA PUBLICAÇÃO (2026)
+            if "DATA PUBLICAÇÃO" in chunk.columns:
+                chunk = chunk[chunk["DATA PUBLICAÇÃO"].astype(str).str.contains('2026', na=False)]
+            
+            if chunk.empty: continue
+
+            # 2. Filtro de UF (Apenas se Plano Básico)
+            if not acesso_nacional:
+                if "UF" in chunk.columns:
+                    chunk = chunk[chunk["UF"].astype(str).str.upper() == uf_sigla]
+
+            if chunk.empty: continue
+
+            # 3. Seleção Final de Colunas
             cols_disponiveis = [c for c in colunas_finais if c in chunk.columns]
             lista_dados.append(chunk[cols_disponiveis].copy())
 
@@ -104,30 +103,29 @@ def exibir_recursos():
         return
 
     if df_full.empty:
-        st.warning("Nenhum convênio publicado em 2026 encontrado para os critérios selecionados.")
+        st.warning("Nenhum registro de 2026 encontrado para os critérios aplicados.")
         return
 
-    # --- CONVERSÃO DE DATAS PARA FILTROS NO TOPO ---
+    # --- TRATAMENTO DE DATAS ---
     for col_data in ["DATA INÍCIO VIGÊNCIA", "DATA FINAL VIGÊNCIA"]:
         if col_data in df_full.columns:
             df_full[col_data] = pd.to_datetime(df_full[col_data], errors='coerce', dayfirst=True)
 
-    # --- FILTROS NO TOPO (LADO DIREITO) ---
-    st.markdown("### 🔍 Filtros de Vigência")
+    # --- FILTROS DE TOPO (LADO DIREITO) ---
+    st.markdown("### 🔍 Parâmetros de Vigência")
     c1, c2 = st.columns(2)
-    
     with c1:
-        data_inicio = st.date_input("Início da Vigência a partir de:", value=None)
+        data_inicio = st.date_input("Vigência Inicial a partir de:", value=None)
     with c2:
-        data_fim = st.date_input("Final da Vigência até:", value=None)
+        data_fim = st.date_input("Vigência Final até:", value=None)
 
-    # Aplicação dos filtros de data
+    # Aplicação dinâmica dos filtros de data
     if data_inicio:
         df_full = df_full[df_full["DATA INÍCIO VIGÊNCIA"] >= pd.Timestamp(data_inicio)]
     if data_fim:
         df_full = df_full[df_full["DATA FINAL VIGÊNCIA"] <= pd.Timestamp(data_fim)]
 
-    # --- MÉTRICAS ---
+    # --- MÉTRICAS DE RESUMO ---
     v_conv = df_full["VALOR CONVÊNIO"].apply(limpar_valor).sum() if "VALOR CONVÊNIO" in df_full.columns else 0
     v_lib = df_full["VALOR LIBERADO"].apply(limpar_valor).sum() if "VALOR LIBERADO" in df_full.columns else 0
     
@@ -137,10 +135,10 @@ def exibir_recursos():
 
     st.divider()
 
-    # --- PLANILHA FINAL ---
-    st.write(f"Exibindo **{len(df_full)}** registros filtrados.")
+    # --- EXIBIÇÃO DA PLANILHA ---
+    st.write(f"Exibindo **{len(df_full)}** convênios filtrados.")
     
-    # Formata datas para exibição bonita (DD/MM/AAAA)
+    # Formatação de datas para visualização amigável
     df_display = df_full.copy()
     for col in ["DATA INÍCIO VIGÊNCIA", "DATA FINAL VIGÊNCIA"]:
         if col in df_display.columns:
