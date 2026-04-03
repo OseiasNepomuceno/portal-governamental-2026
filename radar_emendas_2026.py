@@ -23,18 +23,37 @@ def remover_acentos(texto):
 def exibir_radar():
     st.title("🏛️ Radar de Emendas Parlamentares 2026")
 
-    file_id = st.secrets.get("file_id_emendas")
-    nome_arquivo = "2026_Emendas.csv"
+    # --- NOVO: FILTRO DE VISÃO (LADO DIREITO DO TOPO) ---
+    col_titulo, col_filtro = st.columns([2, 1])
+    with col_filtro:
+        tipo_visao = st.selectbox(
+            "Selecione a Visualização:",
+            ["Visão Geral", "Por Favorecido"],
+            index=0
+        )
 
+    # Definição do ID do arquivo baseado na escolha
+    if tipo_visao == "Visão Geral":
+        file_id = st.secrets.get("file_id_emendas")
+        nome_arquivo = "2026_Emendas_Geral.csv"
+    else:
+        file_id = st.secrets.get("file_id_emendas_favorecido") # Adicione este ID no seu Secrets
+        nome_arquivo = "2026_Emendas_Favorecido.csv"
+
+    # 1. Download do arquivo escolhido
     if not os.path.exists(nome_arquivo):
-        with st.spinner("Sincronizando Base de Emendas..."):
+        if not file_id:
+            st.error(f"Erro: ID para '{tipo_visao}' não configurado no Secrets.")
+            return
+        with st.spinner(f"Sincronizando {tipo_visao}..."):
             try:
                 url = f'https://drive.google.com/uc?id={file_id}'
                 gdown.download(url, nome_arquivo, quiet=False, fuzzy=True)
             except Exception as e:
-                st.error(f"Erro ao baixar base: {e}")
+                st.error(f"Erro no download: {e}")
                 return
 
+    # 2. Leitura da Base
     try:
         df = pd.read_csv(nome_arquivo, sep=None, engine='python', encoding='latin1', on_bad_lines='skip')
         df.columns = [str(c).strip().upper() for c in df.columns]
@@ -42,37 +61,40 @@ def exibir_radar():
         st.error(f"Erro na leitura: {e}")
         return
 
-    # --- LÓGICA DE FILTRO POR NOME COMPLETO ---
+    # 3. Lógica de Segurança (Plano e Estado)
     usuario = st.session_state.get('usuario_logado', {})
     plano = str(usuario.get('PLANO', 'BRONZE')).upper()
-    
-    # Pega a sigla (ex: RJ) e converte para nome completo (ex: RIO DE JANEIRO)
     sigla_usuario = str(usuario.get('LOCALIDADE') or "RJ").strip().upper()
-    nome_completo_busca = MAPA_ESTADOS.get(sigla_usuario, sigla_usuario) 
     
-    # Normaliza para garantir (remove acentos se houver no dicionário ou cadastro)
-    nome_completo_busca = remover_acentos(nome_completo_busca)
-    
+    # Converte para nome completo para bater com a planilha
+    nome_completo_busca = remover_acentos(MAPA_ESTADOS.get(sigla_usuario, sigla_usuario))
     acesso_nacional = (plano in ["PREMIUM", "DIAMANTE", "OURO"])
 
-    if "UF" in df.columns:
+    # Identifica a coluna de UF (pode variar entre os dois arquivos)
+    coluna_uf = "UF" if "UF" in df.columns else "ESTADO" if "ESTADO" in df.columns else None
+
+    if coluna_uf:
         if not acesso_nacional:
-            # Normaliza a coluna UF da planilha (transforma 'SÃO PAULO' em 'SAO PAULO')
-            df['UF_BUSCA'] = df['UF'].apply(remover_acentos)
-            
-            # Filtra pelo nome completo normalizado
+            # Aplica normalização para garantir que 'RIO DE JANEIRO' funcione com ou sem acento
+            df['UF_BUSCA'] = df[coluna_uf].apply(remover_acentos)
             df = df[df['UF_BUSCA'] == nome_completo_busca]
             df = df.drop(columns=['UF_BUSCA'])
-            
-            st.info(f"📍 Filtro Ativo: **{nome_completo_busca}**")
+            st.info(f"📍 Exibindo dados de: **{nome_completo_busca}**")
         else:
-            st.success(f"✅ Acesso Nacional Liberado")
+            st.success(f"✅ Acesso Nacional Liberado - {tipo_visao}")
     else:
-        st.error("Coluna 'UF' não encontrada.")
-        return
+        st.warning("Aviso: Coluna de localização não identificada para filtro automático.")
 
+    # 4. Exibição
     if df.empty:
-        st.warning(f"Nenhum registro encontrado para: {nome_completo_busca}")
+        st.warning(f"Nenhum registro encontrado em '{tipo_visao}' para sua região.")
     else:
-        st.write(f"Encontrados: **{len(df)}** registros.")
+        st.write(f"Total de registros: **{len(df)}**")
+        
+        # Filtro de busca textual rápido para o consultor
+        busca = st.text_input(f"🔍 Pesquisar em {tipo_visao} (Nome, CNPJ, Partido...):")
+        if busca:
+            mask = df.astype(str).apply(lambda x: x.str.contains(busca, case=False)).any(axis=1)
+            df = df[mask]
+
         st.dataframe(df, use_container_width=True, hide_index=True)
