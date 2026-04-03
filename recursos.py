@@ -1,4 +1,4 @@
-# Arquivo: recursos.py - Atualizado em 03/04/2026
+# Arquivo: recursos.py - Atualizado com Trava de Segurança em 03/04/2026
 import streamlit as st
 import pandas as pd
 import gdown
@@ -108,21 +108,30 @@ def exibir_recursos():
         if filtro_uf != "Todos":
             df_f = df_f[df_f[col_uf] == filtro_uf]
 
-        # Métricas
+        # --- MÉTRICAS COM AJUSTE DE SEGURANÇA (EVITA TELA BRANCA) ---
         st.markdown("---")
         m1, m2 = st.columns(2)
-        if 'VALOR_NUM' in df_f.columns:
+        
+        if 'VALOR_NUM' in df_f.columns and not df_f.empty:
             total = df_f['VALOR_NUM'].sum()
-            m1.metric("Volume de Recursos", f"R$ {total:,.2f}".replace(",", "X").replace(".", ",").replace("X", "."))
-        m2.metric("Projetos Identificados", len(df_f))
+            valor_formatado = f"R$ {total:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+            m1.metric("Volume de Recursos", valor_formatado)
+        else:
+            m1.metric("Volume de Recursos", "R$ 0,00")
+            
+        m2.metric("Resultados Encontrados", len(df_f))
 
-        st.dataframe(df_f.head(300), use_container_width=True)
+        # --- EXIBIÇÃO DA TABELA ---
+        if df_f.empty:
+            st.warning("📍 Nenhum dado encontrado para os filtros selecionados ou para sua região liberada.")
+        else:
+            st.dataframe(df_f.head(300), use_container_width=True)
+            
     else:
         st.warning("⚠️ Não foi possível carregar os dados de Recursos. Verifique sua conexão ou permissões.")
 
 # Se rodar este arquivo isoladamente (para testes)
 if __name__ == "__main__":
-    # Mock de dados apenas para teste local
     if 'usuario_logado' not in st.session_state:
         st.session_state['usuario_logado'] = {'PLANO': 'DIAMANTE', 'local_liberado': 'TODOS'}
     exibir_recursos()
