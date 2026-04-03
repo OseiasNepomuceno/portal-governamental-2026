@@ -99,23 +99,43 @@ def tela_cadastro():
         
         btn_enviar = st.form_submit_button("FINALIZAR CADASTRO E SOLICITAR ACESSO")
         
-        if btn_enviar:
+       if btn_enviar:
             if nome and email and senha:
-                # --- AJUSTE DA ORDEM DAS COLUNAS ---
-                # A ordem deve ser: [USUARIO, SENHA, STATUS, PLANO, TIPO_CONSULTOR, LOCALIDADE]
-                # Verifique se a sua planilha segue exatamente essa sequência:
-                
-                status_inicial = "pendente" # O status vai para a 3ª coluna
-                tipo_consultor = "CONSULTOR" # Exemplo de preenchimento para a 5ª coluna
+                # --- LÓGICA DO TIPO DE CONSULTOR ---
+                if plano_final == "BRONZE":
+                    tipo_consultor = "MUNICIPAL"
+                elif plano_final in ["PRATA", "OURO"]:
+                    tipo_consultor = "ESTADUAL"
+                else: # DIAMANTE
+                    tipo_consultor = "NACIONAL"
+
+                # --- ORDEM DAS COLUNAS (ALINHADA COM A PLANILHA) ---
+                # 1. usuario | 2. senha | 3. status | 4. plano | 5. tipo_consultor | 6. localidade
+                status_inicial = "pendente" 
                 
                 novo_usuario = [
-                    email,           # Coluna: usuario
-                    senha,           # Coluna: senha
-                    status_inicial,  # Coluna: status (Agora fixo como 'pendente')
-                    plano_final,     # Coluna: plano (Agora no lugar certo)
-                    tipo_consultor,  # Coluna: tipo_consultor
-                    localidade       # Coluna: localidade/local_liberado
+                    email,           # Coluna A: usuario
+                    senha,           # Coluna B: senha
+                    status_inicial,  # Coluna C: status
+                    plano_final,     # Coluna D: plano
+                    tipo_consultor,  # Coluna E: tipo_consultor (Dinâmico)
+                    localidade       # Coluna F: localidade/local_liberado
                 ]
+                
+                if salvar_cadastro_google_sheets(novo_usuario):
+                    st.success("✅ Solicitação enviada com sucesso!")
+                    
+                    # Notificação por E-mail (Aviso para você)
+                    enviar_aviso_email(nome, plano_final, email)
+                    
+                    # Botão para o cliente te avisar no WhatsApp
+                    link_zap = gerar_link_whatsapp(nome, plano_final)
+                    st.info("Para agilizar sua liberação, clique abaixo:")
+                    st.link_button("📱 AVISAR NO WHATSAPP", link_zap)
+                else:
+                    st.error("Erro técnico ao salvar na planilha.")
+            else:
+                st.error("Preencha todos os campos obrigatórios.")
                 
                 if salvar_cadastro_google_sheets(novo_usuario):
                     st.success("✅ Solicitação enviada com sucesso!")
