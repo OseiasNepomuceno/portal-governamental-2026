@@ -151,12 +151,29 @@ def tela_cadastro():
 # --- 4. NAVEGAÇÃO E LÓGICA PRINCIPAL ---
 
 def executar():
+    # 1. GARANTE QUE AS CHAVES EXISTAM NO ESTADO DA SESSÃO
     if 'logado' not in st.session_state:
         st.session_state['logado'] = False
     if 'tela' not in st.session_state:
         st.session_state['tela'] = 'home'
 
+    # 2. SE NÃO ESTIVER LOGADO, MOSTRA AS TELAS PÚBLICAS
     if not st.session_state['logado']:
         if st.session_state['tela'] == 'home':
-            st.markdown("<h1 style='text-align: center;'>🛰️ Core Essence</h1>", unsafe_allow_html=True)
-            st.markdown("<h3 style='text-align: center; color: #555;'>Inteligência Governamental Estratégica</h3>", unsafe_allow_html=True)
+            # ... (seu código da home aqui)
+            st.title("🛰️ Core Essence")
+            if st.button("🚀 QUERO ME CADASTRAR"):
+                st.session_state['tela'] = 'cadastro'
+                st.rerun()
+
+        elif st.session_state['tela'] == 'cadastro':
+            tela_cadastro()
+            
+        elif st.session_state['tela'] == 'login':
+            # ... (seu código de login aqui)
+            pass
+
+    # 3. SE ESTIVER LOGADO, MOSTRA A ÁREA RESTRITA
+    else:
+        # ... (seu código da área logada com a sidebar aqui)
+        st.sidebar.write("Bem-vindo!")
