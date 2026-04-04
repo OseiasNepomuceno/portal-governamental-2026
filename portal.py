@@ -21,11 +21,18 @@ def registrar_log_acesso(usuario, plano):
             creds = Credentials.from_service_account_file(nome_da_chave, scopes=scope)
             client = gspread.authorize(creds)
             sh = client.open("ID_LICENÇAS")
-            planilha = sh.worksheet("logs")
+            
+            # CORREÇÃO: Nome da aba conforme sua planilha
+            planilha = sh.worksheet("LOG_ACESSOS")
+            
             data_hora = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
-            planilha.append_row([data_hora, usuario, plano])
+            acao = f"Login Efetuado - Plano {plano}"
+            
+            # CORREÇÃO: Ordem das colunas [DATA E HORA, USUÁRIO, AÇÃO]
+            planilha.append_row([data_hora, usuario, acao])
     except Exception as e:
-        print(f"Erro ao registrar log: {e}")
+        # Mostra o erro na tela apenas se houver falha crítica, facilitando o debug
+        st.error(f"Erro ao registrar log na aba LOG_ACESSOS: {e}")
 
 def salvar_cadastro_google_sheets(dados_cliente):
     scope = ["https://www.googleapis.com/auth/spreadsheets", "https://www.googleapis.com/auth/drive"]
@@ -64,6 +71,7 @@ def autenticar_usuario(usuario_digitado, senha_digitada):
                     'LOCALIDADE': dados.iloc[4] if len(dados) >= 5 else "BR",
                     'REVISOES_USADAS': dados.iloc[5] if len(dados) >= 6 else 0
                 }
+                # Chamada da função de log atualizada
                 registrar_log_acesso(u_clean, st.session_state['usuario_plano'])
                 return True
         return False
@@ -72,7 +80,6 @@ def autenticar_usuario(usuario_digitado, senha_digitada):
 # --- 3. COMPONENTES DE INTERFACE ---
 
 def exibir_home_publica():
-    # Exibição da Logo na Home
     if os.path.exists("logocoregov.png"):
         col_l1, col_l2, col_l3 = st.columns([1, 1, 1])
         with col_l2:
@@ -192,7 +199,6 @@ def executar():
                 st.rerun()
     else:
         with st.sidebar:
-            # Exibição da Logo no Menu Lateral
             if os.path.exists("logocoregov.png"):
                 st.image("logocoregov.png", use_container_width=True)
             
@@ -215,8 +221,11 @@ def executar():
                 creds = Credentials.from_service_account_file('ponto-facial-oseiascarveng-cd7b1ab54295.json', scopes=["https://www.googleapis.com/auth/spreadsheets", "https://www.googleapis.com/auth/drive"])
                 client = gspread.authorize(creds)
                 sh = client.open("ID_LICENÇAS")
-                st.subheader("📝 Logs de Acesso")
-                st.dataframe(pd.DataFrame(sh.worksheet("logs").get_all_records()))
+                
+                # CORREÇÃO: Exibindo aba de logs atualizada na área administrativa
+                st.subheader("📝 Logs de Acesso (Aba: LOG_ACESSOS)")
+                st.dataframe(pd.DataFrame(sh.worksheet("LOG_ACESSOS").get_all_records()))
+                
                 st.subheader("👥 Base de Usuários")
                 st.dataframe(pd.DataFrame(sh.worksheet("usuario").get_all_records()))
             except Exception as e: st.error(f"Erro: {e}")
