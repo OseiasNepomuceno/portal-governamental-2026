@@ -72,6 +72,12 @@ def autenticar_usuario(usuario_digitado, senha_digitada):
 # --- 3. COMPONENTES DE INTERFACE ---
 
 def exibir_home_publica():
+    # Exibição da Logo na Home
+    if os.path.exists("logocoregov.png"):
+        col_l1, col_l2, col_l3 = st.columns([1, 1, 1])
+        with col_l2:
+            st.image("logocoregov.png", use_container_width=True)
+    
     st.markdown("<h1 style='text-align: center; color: #007bff;'>🛰️ CoreGov</h1>", unsafe_allow_html=True)
     st.markdown("<h3 style='text-align: center;'>Inteligência Governamental Estratégica</h3>", unsafe_allow_html=True)
     st.write("\n")
@@ -186,6 +192,10 @@ def executar():
                 st.rerun()
     else:
         with st.sidebar:
+            # Exibição da Logo no Menu Lateral
+            if os.path.exists("logocoregov.png"):
+                st.image("logocoregov.png", use_container_width=True)
+            
             st.title("CoreGov")
             user = st.session_state.get('usuario_nome', 'admin')
             st.info(f"👤 {user.upper()}")
