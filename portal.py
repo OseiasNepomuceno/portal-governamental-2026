@@ -13,36 +13,44 @@ import revisor_estatuto
 
 # --- 2. FUNÇÕES DE APOIO ---
 
-def registrar_log_acesso(usuario, plano):
+def obter_creds():
+    """Gerencia a autenticação usando Secrets (Nuvem) ou Arquivo JSON (Local)"""
     scope = ["https://www.googleapis.com/auth/spreadsheets", "https://www.googleapis.com/auth/drive"]
+    
+    # 1. Tenta buscar nos Secrets do Streamlit (Para o domínio coregov.com.br)
+    if "gcp_service_account" in st.secrets:
+        return Credentials.from_service_account_info(st.secrets["gcp_service_account"], scopes=scope)
+    
+    # 2. Se não achar nos secrets, tenta o arquivo local (Para testes no seu PC)
+    nome_da_chave = 'ponto-facial-oseiascarveng-cd7b1ab54295.json'
+    if os.path.exists(nome_da_chave):
+        return Credentials.from_service_account_file(nome_da_chave, scopes=scope)
+    
+    return None
+
+def registrar_log_acesso(usuario, plano):
     try:
-        nome_da_chave = 'ponto-facial-oseiascarveng-cd7b1ab54295.json'
-        if os.path.exists(nome_da_chave):
-            creds = Credentials.from_service_account_file(nome_da_chave, scopes=scope)
+        creds = obter_creds()
+        if creds:
             client = gspread.authorize(creds)
             sh = client.open("ID_LICENÇAS")
-            
-            # CORREÇÃO: Nome da aba conforme sua planilha
             planilha = sh.worksheet("LOG_ACESSOS")
             
             data_hora = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
             acao = f"Login Efetuado - Plano {plano}"
             
-            # CORREÇÃO: Ordem das colunas [DATA E HORA, USUÁRIO, AÇÃO]
             planilha.append_row([data_hora, usuario, acao])
     except Exception as e:
-        # Mostra o erro na tela apenas se houver falha crítica, facilitando o debug
-        st.error(f"Erro ao registrar log na aba LOG_ACESSOS: {e}")
+        st.error(f"Erro ao registrar log: {e}")
 
 def salvar_cadastro_google_sheets(dados_cliente):
-    scope = ["https://www.googleapis.com/auth/spreadsheets", "https://www.googleapis.com/auth/drive"]
     try:
-        nome_da_chave = 'ponto-facial-oseiascarveng-cd7b1ab54295.json'
-        creds = Credentials.from_service_account_file(nome_da_chave, scopes=scope)
-        client = gspread.authorize(creds)
-        planilha = client.open("ID_LICENÇAS").worksheet("usuario")
-        planilha.append_row(dados_cliente)
-        return True
+        creds = obter_creds()
+        if creds:
+            client = gspread.authorize(creds)
+            planilha = client.open("ID_LICENÇAS").worksheet("usuario")
+            planilha.append_row(dados_cliente)
+            return True
     except: return False
 
 def autenticar_usuario(usuario_digitado, senha_digitada):
@@ -71,7 +79,6 @@ def autenticar_usuario(usuario_digitado, senha_digitada):
                     'LOCALIDADE': dados.iloc[4] if len(dados) >= 5 else "BR",
                     'REVISOES_USADAS': dados.iloc[5] if len(dados) >= 6 else 0
                 }
-                # Chamada da função de log atualizada
                 registrar_log_acesso(u_clean, st.session_state['usuario_plano'])
                 return True
         return False
@@ -218,16 +225,16 @@ def executar():
         elif escolha == "🔧 Gestão Admin":
             st.title("🔧 Gestão Administrativa CoreGov")
             try:
-                creds = Credentials.from_service_account_file('ponto-facial-oseiascarveng-cd7b1ab54295.json', scopes=["https://www.googleapis.com/auth/spreadsheets", "https://www.googleapis.com/auth/drive"])
-                client = gspread.authorize(creds)
-                sh = client.open("ID_LICENÇAS")
-                
-                # CORREÇÃO: Exibindo aba de logs atualizada na área administrativa
-                st.subheader("📝 Logs de Acesso (Aba: LOG_ACESSOS)")
-                st.dataframe(pd.DataFrame(sh.worksheet("LOG_ACESSOS").get_all_records()))
-                
-                st.subheader("👥 Base de Usuários")
-                st.dataframe(pd.DataFrame(sh.worksheet("usuario").get_all_records()))
+                creds = obter_creds()
+                if creds:
+                    client = gspread.authorize(creds)
+                    sh = client.open("ID_LICENÇAS")
+                    st.subheader("📝 Logs de Acesso (Aba: LOG_ACESSOS)")
+                    st.dataframe(pd.DataFrame(sh.worksheet("LOG_ACESSOS").get_all_records()))
+                    st.subheader("👥 Base de Usuários")
+                    st.dataframe(pd.DataFrame(sh.worksheet("usuario").get_all_records()))
+                else:
+                    st.error("Credenciais não encontradas nos Secrets ou no arquivo local.")
             except Exception as e: st.error(f"Erro: {e}")
         elif escolha == "🏛️ Radar de Emendas": radar_emendas_2026.exibir_radar()
         elif escolha == "📊 Recursos 2026": recursos2026.exibir_recursos()
