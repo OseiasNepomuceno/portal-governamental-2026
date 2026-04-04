@@ -29,6 +29,17 @@ def registrar_log_acesso(usuario, plano):
     except Exception as e:
         print(f"Erro ao registrar log: {e}")
 
+def salvar_cadastro_google_sheets(dados_cliente):
+    scope = ["https://www.googleapis.com/auth/spreadsheets", "https://www.googleapis.com/auth/drive"]
+    try:
+        nome_da_chave = 'ponto-facial-oseiascarveng-cd7b1ab54295.json'
+        creds = Credentials.from_service_account_file(nome_da_chave, scopes=scope)
+        client = gspread.authorize(creds)
+        planilha = client.open("ID_LICENÇAS").worksheet("usuario")
+        planilha.append_row(dados_cliente)
+        return True
+    except: return False
+
 def autenticar_usuario(usuario_digitado, senha_digitada):
     file_id = st.secrets.get("file_id_licencas")
     nome_arquivo = "licencas_login.xlsx"
@@ -58,9 +69,7 @@ def autenticar_usuario(usuario_digitado, senha_digitada):
                 registrar_log_acesso(u_clean, st.session_state['usuario_plano'])
                 return True
         return False
-    except Exception as e:
-        st.error(f"Erro na autenticação: {e}")
-        return False
+    except: return False
 
 # --- 3. COMPONENTES DE INTERFACE ---
 
@@ -78,16 +87,41 @@ def exibir_home_publica():
 
     with col2:
         st.markdown('<div style="background-color: #f8f9fa; padding: 20px; border-radius: 15px; border-top: 5px solid #28a745; min-height: 200px; text-align: center;"><h4>🚀 Seja Consultor</h4><p>Cadastre-se para utilizar nossas ferramentas de IA parlamentar.</p></div>', unsafe_allow_html=True)
-        st.button("CRIAR CONTA", use_container_width=True, disabled=True) # Exemplo desativado
+        # BOTÃO CORRIGIDO AQUI:
+        if st.button("CRIAR CONTA / CADASTRAR", use_container_width=True):
+            st.session_state['tela'] = 'cadastro'
+            st.rerun()
 
     with col3:
         st.markdown('<div style="background-color: #f8f9fa; padding: 20px; border-radius: 15px; border-top: 5px solid #ffc107; min-height: 200px; text-align: center;"><h4>🛰️ Ecossistema</h4><p>Tecnologia e consultoria para captação estratégica.</p></div>', unsafe_allow_html=True)
         st.info("💡 Consultoria + Tecnologia")
 
+def tela_cadastro():
+    st.title("🚀 Novo Cadastro")
+    if st.button("⬅️ Voltar"):
+        st.session_state['tela'] = 'home'
+        st.rerun()
+        
+    with st.form("form_registro"):
+        nome = st.text_input("Nome Completo")
+        email = st.text_input("E-mail (Seu Login)")
+        senha = st.text_input("Senha", type="password")
+        plano = st.selectbox("Plano", ["BÁSICO", "PREMIUM"])
+        local = st.text_input("Local de Atuação (UF)")
+        
+        if st.form_submit_button("CADASTRAR"):
+            if nome and email and senha:
+                # [Email, Senha, Status, Plano, Local, Revisões]
+                if salvar_cadastro_google_sheets([email, senha, 'pendente', plano, local, 0]):
+                    st.success("Cadastro realizado! Aguarde a ativação pelo administrador.")
+                else:
+                    st.error("Erro ao salvar cadastro.")
+            else:
+                st.warning("Preencha todos os campos.")
+
 def exibir_dashboard_boas_vindas(nome, plano, uso_revisor):
     st.markdown(f"### 👋 Bem-vindo, {nome.capitalize()}!")
     col1, col2, col3 = st.columns(3)
-    # Conteúdo dos cards (resumido para brevidade)
     with col1: st.success("📊 Radar 2026 Ativo")
     with col2: st.info(f"📑 Revisor IA: {uso_revisor} usos")
     with col3: st.warning(f"🏆 Plano {plano}")
@@ -98,14 +132,14 @@ def exibir_dashboard_boas_vindas(nome, plano, uso_revisor):
 st.set_page_config(page_title="Core Essence", page_icon="🛰️", layout="wide")
 
 def executar():
-    # Inicialização do estado
     if 'logado' not in st.session_state: st.session_state['logado'] = False
     if 'tela' not in st.session_state: st.session_state['tela'] = 'home'
 
     if not st.session_state['logado']:
         if st.session_state['tela'] == 'home':
             exibir_home_publica()
-        
+        elif st.session_state['tela'] == 'cadastro':
+            tela_cadastro()
         elif st.session_state['tela'] == 'login':
             st.title("🔑 Login")
             with st.form("login_form"):
@@ -113,10 +147,9 @@ def executar():
                 p = st.text_input("Senha", type="password")
                 if st.form_submit_button("Entrar"):
                     if autenticar_usuario(u, p):
-                        st.session_state['tela'] = 'app' # Muda para o estado logado
+                        st.session_state['logado'] = True
                         st.rerun()
-                    else:
-                        st.error("Usuário ou senha incorretos.")
+                    else: st.error("Acesso negado.")
             if st.button("⬅️ Voltar"):
                 st.session_state['tela'] = 'home'
                 st.rerun()
@@ -124,25 +157,18 @@ def executar():
         # ÁREA LOGADA
         with st.sidebar:
             st.title("Core Essence")
-            user = st.session_state['usuario_nome']
+            user = st.session_state.get('usuario_nome', 'admin')
             st.info(f"👤 {user.upper()}")
-            
             menu = ["🏠 Home", "📊 Recursos 2026", "🏛️ Radar de Emendas", "📜 Revisor de Estatuto"]
-            if user == "admin": menu.append("🔧 Gestão Admin")
+            if user.lower() == "admin": menu.append("🔧 Gestão Admin")
             menu.append("🚪 Sair")
             escolha = st.radio("Módulos:", menu)
 
         if escolha == "🚪 Sair":
-            # --- CORREÇÃO DO LOGOUT ---
-            st.session_state['logado'] = False
-            st.session_state['tela'] = 'home'
-            # Limpa apenas chaves específicas se quiser manter a performance, 
-            # ou limpa tudo e redefine a tela inicial:
             st.session_state.clear()
             st.session_state['logado'] = False
             st.session_state['tela'] = 'home'
             st.rerun()
-
         elif escolha == "🔧 Gestão Admin":
             st.title("🔧 Gestão Administrativa")
             try:
@@ -154,12 +180,11 @@ def executar():
                 st.subheader("👥 Usuários")
                 st.dataframe(pd.DataFrame(sh.worksheet("usuario").get_all_records()))
             except Exception as e: st.error(f"Erro: {e}")
-
         elif escolha == "🏛️ Radar de Emendas": radar_emendas_2026.exibir_radar()
         elif escolha == "📊 Recursos 2026": recursos2026.exibir_recursos()
         elif escolha == "📜 Revisor de Estatuto": revisor_estatuto.exibir_revisor()
         else:
-            exibir_dashboard_boas_vindas(user, st.session_state['usuario_plano'], st.session_state['usuario_logado']['REVISOES_USADAS'])
+            exibir_dashboard_boas_vindas(user, st.session_state.get('usuario_plano', 'BÁSICO'), st.session_state.get('usuario_logado', {}).get('REVISOES_USADAS', 0))
 
 if __name__ == "__main__":
     executar()
