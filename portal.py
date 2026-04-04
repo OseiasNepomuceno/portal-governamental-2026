@@ -81,14 +81,13 @@ def exibir_home_publica():
     col1, col2, col3 = st.columns(3)
     with col1:
         st.markdown('<div style="background-color: #f8f9fa; padding: 20px; border-radius: 15px; border-top: 5px solid #007bff; min-height: 200px; text-align: center;"><h4>👤 Já é Cliente?</h4><p>Acesse sua área exclusiva para monitorar emendas e recursos.</p></div>', unsafe_allow_html=True)
-        if st.button("FAZER LOGIN", use_container_width=True, type="primary"):
+        if st.button("FAZER LOGIN", key="btn_login_home", use_container_width=True, type="primary"):
             st.session_state['tela'] = 'login'
             st.rerun()
 
     with col2:
         st.markdown('<div style="background-color: #f8f9fa; padding: 20px; border-radius: 15px; border-top: 5px solid #28a745; min-height: 200px; text-align: center;"><h4>🚀 Seja Consultor</h4><p>Cadastre-se para utilizar nossas ferramentas de IA parlamentar.</p></div>', unsafe_allow_html=True)
-        # BOTÃO CORRIGIDO AQUI:
-        if st.button("CRIAR CONTA / CADASTRAR", use_container_width=True):
+        if st.button("CRIAR CONTA / CADASTRAR", key="btn_cad_home", use_container_width=True):
             st.session_state['tela'] = 'cadastro'
             st.rerun()
 
@@ -97,23 +96,60 @@ def exibir_home_publica():
         st.info("💡 Consultoria + Tecnologia")
 
 def tela_cadastro():
-    st.title("🚀 Novo Cadastro")
-    if st.button("⬅️ Voltar"):
+    st.markdown("<h2 style='text-align: center; color: #28a745;'>🚀 Iniciar Nova Consultoria Especializada</h2>", unsafe_allow_html=True)
+    
+    links_pagamento = {
+        "BÁSICO": "https://mpago.la/1gf9ryq",
+        "PREMIUM": "https://mpago.la/2CUKQgx"
+    }
+
+    if st.button("⬅️ Voltar para o Início"):
         st.session_state['tela'] = 'home'
         st.rerun()
-        
-    with st.form("form_registro"):
+
+    # Cards Informativos
+    col_p1, col_p2 = st.columns(2)
+    with col_p1:
+        st.markdown("""
+            <div style="background-color: #f8f9fa; padding: 15px; border-radius: 10px; border-top: 5px solid #6c757d; min-height: 250px;">
+                <h4 style="color: #495057; margin:0;">🌱 PLANO BÁSICO (ESTADUAL)</h4>
+                <p style="font-size: 13px; color: #666;">Consultoria estratégica para atuação regional.</p>
+                <h3 style="color: #333; margin-top: 5px;">R$ 1.250,00 <small style="font-size: 12px;">/mês</small></h3>
+                <ul style="font-size: 12px; color: #444;">
+                    <li><b>Radar de Emendas:</b> Todo o estado escolhido</li>
+                    <li>Monitoramento de Recursos 2026</li>
+                    <li><b>Até 10 Revisões de Estatuto por IA</b></li>
+                </ul>
+            </div>
+        """, unsafe_allow_html=True)
+    with col_p2:
+        st.markdown("""
+            <div style="background-color: #e7f5ff; padding: 15px; border-radius: 10px; border-top: 5px solid #007bff; min-height: 250px;">
+                <h4 style="color: #007bff; margin:0;">💎 PLANO PREMIUM (NACIONAL)</h4>
+                <p style="font-size: 13px; color: #666;">Inteligência de dados para escala nacional.</p>
+                <h3 style="color: #007bff; margin-top: 5px;">R$ 2.300,00 <small style="font-size: 12px; color: #333;">/mês</small></h3>
+                <ul style="font-size: 12px; color: #444;">
+                    <li><b>Acesso Nacional:</b> Todos os municípios e estados</li>
+                    <li>Inteligência de Dados Prioritária</li>
+                    <li><b>Até 15 Revisões de Estatuto por IA</b></li>
+                </ul>
+            </div>
+        """, unsafe_allow_html=True)
+
+    st.write("\n")
+    with st.form("form_registro_completo"):
         nome = st.text_input("Nome Completo")
         email = st.text_input("E-mail (Seu Login)")
         senha = st.text_input("Senha", type="password")
         plano = st.selectbox("Plano", ["BÁSICO", "PREMIUM"])
-        local = st.text_input("Local de Atuação (UF)")
+        # Campo com placeholder de exemplo
+        local = st.text_input("Local de Atuação", placeholder="Ex: RJ ou Nacional")
         
-        if st.form_submit_button("CADASTRAR"):
+        if st.form_submit_button("PRÓXIMO PASSO: CADASTRAR ➡️", use_container_width=True):
             if nome and email and senha:
-                # [Email, Senha, Status, Plano, Local, Revisões]
                 if salvar_cadastro_google_sheets([email, senha, 'pendente', plano, local, 0]):
-                    st.success("Cadastro realizado! Aguarde a ativação pelo administrador.")
+                    st.success(f"✅ Cadastro realizado, {nome}! Aguarde ativação.")
+                    st.link_button(f"💳 IR PARA PAGAMENTO {plano}", links_pagamento[plano], use_container_width=True)
                 else:
                     st.error("Erro ao salvar cadastro.")
             else:
@@ -147,14 +183,12 @@ def executar():
                 p = st.text_input("Senha", type="password")
                 if st.form_submit_button("Entrar"):
                     if autenticar_usuario(u, p):
-                        st.session_state['logado'] = True
                         st.rerun()
                     else: st.error("Acesso negado.")
             if st.button("⬅️ Voltar"):
                 st.session_state['tela'] = 'home'
                 st.rerun()
     else:
-        # ÁREA LOGADA
         with st.sidebar:
             st.title("Core Essence")
             user = st.session_state.get('usuario_nome', 'admin')
