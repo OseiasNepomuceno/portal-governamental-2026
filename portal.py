@@ -3,8 +3,6 @@ import pandas as pd
 import gdown
 import os
 import gspread
-import smtplib
-from email.mime.text import MIMEText
 from google.oauth2.service_account import Credentials
 from datetime import datetime
 
@@ -74,7 +72,7 @@ def autenticar_usuario(usuario_digitado, senha_digitada):
 # --- 3. COMPONENTES DE INTERFACE ---
 
 def exibir_home_publica():
-    st.markdown("<h1 style='text-align: center; color: #007bff;'>🛰️ Core Essence</h1>", unsafe_allow_html=True)
+    st.markdown("<h1 style='text-align: center; color: #007bff;'>🛰️ CoreGov</h1>", unsafe_allow_html=True)
     st.markdown("<h3 style='text-align: center;'>Inteligência Governamental Estratégica</h3>", unsafe_allow_html=True)
     st.write("\n")
 
@@ -96,7 +94,7 @@ def exibir_home_publica():
         st.info("💡 Consultoria + Tecnologia")
 
 def tela_cadastro():
-    st.markdown("<h2 style='text-align: center; color: #28a745;'>🚀 Iniciar Nova Consultoria Especializada</h2>", unsafe_allow_html=True)
+    st.markdown("<h2 style='text-align: center; color: #28a745;'>🚀 Iniciar Nova Consultoria CoreGov</h2>", unsafe_allow_html=True)
     
     links_pagamento = {
         "BÁSICO": "https://mpago.la/1gf9ryq",
@@ -107,7 +105,6 @@ def tela_cadastro():
         st.session_state['tela'] = 'home'
         st.rerun()
 
-    # Cards Informativos
     col_p1, col_p2 = st.columns(2)
     with col_p1:
         st.markdown("""
@@ -142,13 +139,12 @@ def tela_cadastro():
         email = st.text_input("E-mail (Seu Login)")
         senha = st.text_input("Senha", type="password")
         plano = st.selectbox("Plano", ["BÁSICO", "PREMIUM"])
-        # Campo com placeholder de exemplo
         local = st.text_input("Local de Atuação", placeholder="Ex: RJ ou Nacional")
         
         if st.form_submit_button("PRÓXIMO PASSO: CADASTRAR ➡️", use_container_width=True):
             if nome and email and senha:
                 if salvar_cadastro_google_sheets([email, senha, 'pendente', plano, local, 0]):
-                    st.success(f"✅ Cadastro realizado, {nome}! Aguarde ativação.")
+                    st.success(f"✅ Cadastro realizado no ecossistema CoreGov!")
                     st.link_button(f"💳 IR PARA PAGAMENTO {plano}", links_pagamento[plano], use_container_width=True)
                 else:
                     st.error("Erro ao salvar cadastro.")
@@ -156,7 +152,7 @@ def tela_cadastro():
                 st.warning("Preencha todos os campos.")
 
 def exibir_dashboard_boas_vindas(nome, plano, uso_revisor):
-    st.markdown(f"### 👋 Bem-vindo, {nome.capitalize()}!")
+    st.markdown(f"### 👋 Bem-vindo ao CoreGov, {nome.capitalize()}!")
     col1, col2, col3 = st.columns(3)
     with col1: st.success("📊 Radar 2026 Ativo")
     with col2: st.info(f"📑 Revisor IA: {uso_revisor} usos")
@@ -165,7 +161,7 @@ def exibir_dashboard_boas_vindas(nome, plano, uso_revisor):
 
 # --- 4. EXECUÇÃO PRINCIPAL ---
 
-st.set_page_config(page_title="Core Essence", page_icon="🛰️", layout="wide")
+st.set_page_config(page_title="CoreGov - Inteligência Governamental", page_icon="🛰️", layout="wide")
 
 def executar():
     if 'logado' not in st.session_state: st.session_state['logado'] = False
@@ -177,7 +173,7 @@ def executar():
         elif st.session_state['tela'] == 'cadastro':
             tela_cadastro()
         elif st.session_state['tela'] == 'login':
-            st.title("🔑 Login")
+            st.title("🔑 Login CoreGov")
             with st.form("login_form"):
                 u = st.text_input("Usuário")
                 p = st.text_input("Senha", type="password")
@@ -190,7 +186,7 @@ def executar():
                 st.rerun()
     else:
         with st.sidebar:
-            st.title("Core Essence")
+            st.title("CoreGov")
             user = st.session_state.get('usuario_nome', 'admin')
             st.info(f"👤 {user.upper()}")
             menu = ["🏠 Home", "📊 Recursos 2026", "🏛️ Radar de Emendas", "📜 Revisor de Estatuto"]
@@ -204,14 +200,14 @@ def executar():
             st.session_state['tela'] = 'home'
             st.rerun()
         elif escolha == "🔧 Gestão Admin":
-            st.title("🔧 Gestão Administrativa")
+            st.title("🔧 Gestão Administrativa CoreGov")
             try:
                 creds = Credentials.from_service_account_file('ponto-facial-oseiascarveng-cd7b1ab54295.json', scopes=["https://www.googleapis.com/auth/spreadsheets", "https://www.googleapis.com/auth/drive"])
                 client = gspread.authorize(creds)
                 sh = client.open("ID_LICENÇAS")
-                st.subheader("📝 Logs")
+                st.subheader("📝 Logs de Acesso")
                 st.dataframe(pd.DataFrame(sh.worksheet("logs").get_all_records()))
-                st.subheader("👥 Usuários")
+                st.subheader("👥 Base de Usuários")
                 st.dataframe(pd.DataFrame(sh.worksheet("usuario").get_all_records()))
             except Exception as e: st.error(f"Erro: {e}")
         elif escolha == "🏛️ Radar de Emendas": radar_emendas_2026.exibir_radar()
