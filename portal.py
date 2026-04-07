@@ -101,7 +101,7 @@ def gerenciar_clientes():
 
 # --- 5. INTERFACE PRINCIPAL ---
 
-st.set_page_config(page_title="CoreGov", page_icon="🛰️", layout="wide")
+st.set_page_config(page_title="CoreGov2", page_icon="🛰️", layout="wide")
 
 def executar():
     if 'logado' not in st.session_state: st.session_state['logado'] = False
